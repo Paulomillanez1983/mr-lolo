@@ -19,7 +19,7 @@
    que ya visitaron la tienda descarten la caché anterior.
    ========================================================================== */
 
-const VERSION = 'mrlolo-v3';
+const VERSION = 'mrlolo-v5';
 const CACHE = `${VERSION}-estaticos`;
 
 const BASE = new URL('./', self.location);

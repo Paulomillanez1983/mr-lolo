@@ -1700,3 +1700,107 @@
     .tet__hud { max-width: 30rem; margin: 0 auto; width: 100%; }
   }
 }
+
+/* --------------------------------------------------------------------------
+   14. AVISOS DEL PANEL Y CARGA DE FOTOS
+   -------------------------------------------------------------------------- */
+@layer components {
+  /* El input de archivo va oculto pero presente: con display:none, en varios
+     celulares el .click() programático no abre el selector de fotos. */
+  .archivo-oculto {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .btn--mini {
+    padding: .45rem .7rem;
+    font-size: var(--fs-xs);
+  }
+
+  .admin__pocas {
+    font-size: var(--fs-xs);
+    font-weight: 800;
+    color: #ffb020;
+  }
+
+  .admin__foto-ayuda .btn { flex: none; }
+
+  .alert {
+    display: grid;
+    gap: .55rem;
+    margin-bottom: .9rem;
+    padding: .85rem .9rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: rgb(255 255 255 / .04);
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+    text-align: left;
+  }
+
+  .alert p { margin: 0; }
+  .alert b { font-weight: 800; }
+  .alert .btn { width: 100%; }
+
+  .alert__pie { font-size: var(--fs-xs); color: var(--muted); line-height: 1.55; }
+  .alert .ok { color: var(--g); font-size: var(--fs-xs); font-weight: 700; }
+
+  .alert--stock {
+    border-color: rgb(255 176 32 / .5);
+    background: rgb(255 176 32 / .1);
+  }
+
+  .alert--stock > p:first-child {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem .4rem;
+    align-items: baseline;
+  }
+
+  .alert--stock em { font-style: normal; color: #ffb020; font-weight: 800; }
+
+  .alert--pub {
+    border-color: rgb(0 255 136 / .4);
+    background: rgb(0 255 136 / .07);
+  }
+
+  /* Contraseña del token: que no la ofrezca el gestor de contraseñas del celu */
+  input[data-token] {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--fs-xs);
+    letter-spacing: .02em;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   15. OBJETIVOS TÁCTILES (para usar cómodo con el dedo en el celular)
+   -------------------------------------------------------------------------- */
+@layer components {
+  .dlg-close {
+    width: 42px;
+    height: 42px;
+    font-size: 1.05rem;
+  }
+
+  /* Chips de categoría y pestañas del panel: un poco más altos */
+  .cats button { min-height: 40px; }
+
+  /* Los 5 botones de cada producto del panel: en grilla y sin desbordes */
+  .admin__acts {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: .3rem;
+  }
+
+  .admin__acts button {
+    min-height: 2.7rem;
+    padding: .25rem .2rem;
+    font-size: .63rem;
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

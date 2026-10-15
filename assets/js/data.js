@@ -10,7 +10,10 @@ export const TIENDA = {
   nombre: 'Mr. LOLO',
   bajada: 'Golosinas del recreo, a un toque 🍬',
   firma: 'GOLOSINAS DEL RECREO',
-  version: '3.0',
+  version: '3.1',
+  // Revisión interna: cambia cuando se publica desde el panel. Sirve para
+  // detectar si en un celular quedaron cambios guardados de una versión vieja.
+  revision: 'r3.1',
 
   /* --- Contacto y pago -------------------------------------------------- */
   // WhatsApp con código de país, solo números (Argentina: 549 + área + número).
@@ -47,6 +50,18 @@ export const TIENDA = {
   /* --- Juegos ----------------------------------------------------------- */
   juego: true,
   tetris: true,
+
+  /* --- Stock ------------------------------------------------------------ */
+  // Avisar cuando queden estas unidades o menos.
+  stockBajo: 3,
+
+  /* --- Publicación (para el botón "Publicar" del panel) ----------------- */
+  publicacion: {
+    usuario: 'Paulomillanez1983',
+    repo: 'mr-lolo',
+    rama: 'main',
+    url: 'https://paulomillanez1983.github.io/mr-lolo/',
+  },
 
   /* --- Dominio final (se usa para el QR) -------------------------------- */
   // Dejalo vacío y el QR usa la dirección real desde donde se abrió la tienda.

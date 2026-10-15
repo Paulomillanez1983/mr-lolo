@@ -70,6 +70,8 @@ const CLAVES = {
   triviaDia: 'mrlolo.triviaDia',
   triviaHechos: 'mrlolo.triviaHechos',
   triviaStats: 'mrlolo.triviaStats',
+  token: 'mrlolo.token',
+  base: 'mrlolo.base',
   juegoRecord: 'mrlolo.juegoRecord',
   tetrisRecord: 'mrlolo.tetrisRecord',
   panel: 'mrlolo.panelAbierto',
@@ -90,12 +92,50 @@ const estado = {
   sonido: almacen.get(CLAVES.sonido, '1') !== '0',
   puntos: Number(almacen.get(CLAVES.puntos, '0')) || 0,
   previa: false,
+  configVieja: null,
 };
 
-/* Configuración editada desde el panel local (tiene prioridad sobre data.js) */
+/* Identificador estable de cada golosina. Se usa para el nombre del archivo de
+   su foto cuando se publica, así no se pisan unas con otras. */
+const idProducto = (p, i = 0) =>
+  (p.id ||
+    String(p.nombre || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')) || `producto-${i + 1}`;
+
+/* Configuración editada desde el panel local (tiene prioridad sobre data.js).
+
+   Ojo con esto: si en este dispositivo hay cambios guardados de una versión
+   ANTERIOR de la tienda, aplicarlos taparía lo que se publicó después (o peor:
+   si el dueño los republica, borraría cambios ajenos). Por eso comparamos la
+   "revisión" de data.js con la última con la que se guardó acá. Si no coinciden,
+   no pisamos nada: guardamos la copia local aparte y el panel avisa. */
 function aplicarConfigGuardada() {
   const guardado = almacen.json(CLAVES.config, null);
-  if (!guardado) return;
+  const base = almacen.get(CLAVES.base, '');
+  const versionGuardada = guardado?.tienda?.version || '';
+
+  let alDia = true;
+  if (guardado) {
+    if (base && TIENDA.revision) alDia = base === TIENDA.revision;
+    // Guardados de antes de que existiera la revisión: comparamos la versión.
+    else if (versionGuardada && versionGuardada !== TIENDA.version) alDia = false;
+  }
+
+  if (guardado && alDia) {
+    aplicarGuardado(guardado);
+  } else if (guardado) {
+    estado.configVieja = guardado;
+  }
+
+  // Todo producto tiene que tener id, aunque venga de un data.js viejo.
+  estado.productos.forEach((p, i) => { if (!p.id) p.id = idProducto(p, i); });
+}
+
+function aplicarGuardado(guardado) {
   if (guardado.tienda) Object.assign(estado.tienda, guardado.tienda);
   if (Array.isArray(guardado.productos) && guardado.productos.length) estado.productos = guardado.productos;
   if (!estado.tienda.retiro?.includes(estado.retiro)) estado.retiro = estado.tienda.retiro[0];
@@ -105,8 +145,12 @@ function aplicarConfigGuardada() {
    desde el panel son las que más pesan, porque van dentro del guardado). */
 const pesoConfig = () => JSON.stringify({ tienda: estado.tienda, productos: estado.productos }).length;
 
-const guardarConfig = () =>
-  almacen.set(CLAVES.config, JSON.stringify({ tienda: estado.tienda, productos: estado.productos }));
+function guardarConfig() {
+  const ok = almacen.set(CLAVES.config, JSON.stringify({ tienda: estado.tienda, productos: estado.productos }));
+  // Anotamos con qué revisión de data.js se guardó, para detectar desfases.
+  if (ok && TIENDA.revision) almacen.set(CLAVES.base, TIENDA.revision);
+  return ok;
+}
 
 /* --------------------------------------------------------------------------
    Cálculos
@@ -115,6 +159,9 @@ const codigo = (i) => String.fromCharCode(65 + Math.floor(i / 3)) + ((i % 3) + 1
 
 const stockDe = (p) => (p.stock === null || p.stock === undefined || p.stock === '' ? Infinity : Number(p.stock));
 const agotado = (p) => Boolean(p.agotado) || stockDe(p) <= 0;
+/* stockDe() devuelve Infinity cuando no hay límite, así que este helper
+   evita que la palabra "Infinity" se cuele en cualquier texto. */
+const stockLimitado = (p) => Number.isFinite(stockDe(p));
 
 const unidades = () => Object.values(estado.carrito).reduce((a, b) => a + b, 0);
 const bruto = () => Object.entries(estado.carrito).reduce((a, [i, q]) => a + q * estado.productos[i].precio, 0);
@@ -271,7 +318,7 @@ function pintarGrilla() {
       const q = estado.carrito[i] || 0;
       const sinStock = agotado(p);
       const quedan = stockDe(p);
-      const ultimas = !sinStock && quedan <= 3;
+      const ultimas = !sinStock && quedan <= umbralStock();
       // Ojo: los controles internos NO pueden ir anidados dentro de un <button>
       // (HTML no permite botones dentro de botones: el parser rompe la tarjeta).
       // Por eso la tarjeta es un <div> y el área táctil es un <button> hermano.
@@ -511,6 +558,16 @@ function construirMensaje(lineas, datos) {
   partes.push(`Retiro: ${datos.retiro}`);
   if (datos.nota) partes.push(`Comentarios: ${datos.nota}`);
   partes.push(`Pago por Mercado Pago al alias ${t.alias}`);
+
+  /* Si algo de este pedido está por agotarse, se avisa acá mismo: así Lorenzo
+     se entera en el momento en que le llega el pedido. */
+  const porAgotarse = lineas
+    .map((l) => estado.productos[l.i])
+    .filter((p) => p && !agotado(p) && stockLimitado(p) && stockDe(p) <= umbralStock());
+  if (porAgotarse.length) {
+    partes.push('', '⚠️ OJO — se está por agotar:');
+    porAgotarse.forEach((p) => partes.push(`• ${p.nombre}: quedan ${stockDe(p)}`));
+  }
 
   return partes.join('\n');
 }
@@ -1807,12 +1864,21 @@ function pintarPanelAdmin() {
 
   if (panel.seccion === 'productos') {
     const sinStock = estado.productos.filter(agotado).length;
+    const bajos = estado.productos.filter((p) => !agotado(p) && stockLimitado(p) && stockDe(p) <= umbralStock());
     cuerpo = `
       <div class="admin__stats">
         <span>${estado.productos.length} PRODUCTOS</span>
         <span>${sinStock} AGOTADOS</span>
         <span>STOCK VACÍO = SIN LÍMITE</span>
       </div>
+      ${bajos.length
+        ? `<div class="alert alert--stock">
+             <p><b>⚠️ ${bajos.length} golosina${bajos.length === 1 ? '' : 's'} por agotarse</b>
+             ${bajos.map((p) => `${esc(p.nombre)} <em>(${stockDe(p)})</em>`).join(' · ')}</p>
+             <button class="btn btn--primary" type="button" data-avisar-stock>📲 Avisarme por WhatsApp</button>
+             <p class="alert__pie">Te abre un chat con vos mismo con la lista lista para enviar. Así te queda anotado.</p>
+           </div>`
+        : ''}
       <div class="admin">
         ${estado.productos
           .map(
@@ -1834,17 +1900,22 @@ function pintarPanelAdmin() {
               </select>
               <input data-campo="imagen" data-i="${i}" value="${esc(sinDatos(p.imagen))}" placeholder="…o pegá una ruta o URL de foto">
               <div class="admin__foto-ayuda">
+                <button class="btn btn--ghost btn--mini" type="button" data-foto="${i}">
+                  📷 ${esFotoSubida(p.imagen) ? 'Cambiar foto' : 'Subir foto'}
+                </button>
                 ${esFotoSubida(p.imagen)
-                  ? `<span class="ok">✅ Foto propia cargada</span>
-                     <button class="admin__link" type="button" data-quitar-foto="${i}">quitar</button>`
-                  : '<span>Sacale una foto a la golosina y subila con el 📷</span>'}
+                  ? `<span class="ok">✅</span><button class="admin__link" type="button" data-quitar-foto="${i}">quitar</button>`
+                  : ''}
+                ${!agotado(p) && stockLimitado(p) && stockDe(p) <= umbralStock()
+                  ? `<span class="admin__pocas">¡Quedan ${stockDe(p)}!</span>`
+                  : ''}
               </div>
-              <input type="file" accept="image/*" data-archivo-foto="${i}" hidden>
+              <input type="file" accept="image/*" data-archivo-foto="${i}" class="archivo-oculto">
               <div class="admin__acts">
                 <button type="button" data-mover="${i}:-1" aria-label="Subir">↑</button>
                 <button type="button" data-mover="${i}:1" aria-label="Bajar">↓</button>
                 <button type="button" data-duplicar="${i}">📄</button>
-                <button type="button" data-agotar="${i}">${p.agotado ? '✅ Hay' : '🚫 Agotado'}</button>
+                <button type="button" data-agotar="${i}" aria-label="${p.agotado ? 'Marcar que hay stock' : 'Marcar como agotado'}">${p.agotado ? '✅ Hay' : '🚫 Agotar'}</button>
                 <button type="button" data-borrar="${i}" aria-label="Borrar" style="color:#ff8a8a">🗑️</button>
               </div>
             </div>
@@ -1898,9 +1969,13 @@ function pintarPanelAdmin() {
             <input data-tienda="triviaRondasConPuntos" type="text" inputmode="numeric" value="${t.triviaRondasConPuntos ?? 2}">
           </div>
           <div class="field">
-            <label>VERSIÓN</label>
-            <input data-tienda="version" value="${esc(t.version)}">
+            <label>AVISAR STOCK BAJO CON</label>
+            <input data-tienda="stockBajo" type="text" inputmode="numeric" value="${t.stockBajo ?? 3}">
           </div>
+        </div>
+        <div class="field">
+          <label>VERSIÓN</label>
+          <input data-tienda="version" value="${esc(t.version)}">
         </div>
       </div>
     `;
@@ -1928,21 +2003,44 @@ function pintarPanelAdmin() {
       </div>
     `;
   } else {
+    const pub = estado.tienda.publicacion || {};
+    const hayToken = Boolean(leerToken());
     cuerpo = `
       <div class="admin">
+        <div class="alert alert--pub">
+          <p><b>🚀 Publicar cambios en la tienda</b></p>
+          <p class="alert__pie">
+            Con esto, lo que cambiás acá <b>lo ven todos</b> los que abran el link, en un minuto.
+            Sube las fotos y los precios a GitHub solo, sin salir del celular.
+          </p>
+          <div class="field">
+            <label>TOKEN DE GITHUB ${hayToken ? '· ✅ guardado en este celular' : ''}</label>
+            <input data-token type="password" autocomplete="off" value=""
+              placeholder="${hayToken ? '•••••••• (dejalo vacío para no cambiarlo)' : 'Pegá acá el token'}">
+            <span class="field__hint">
+              Se guarda solo en este dispositivo, nunca se publica.
+              En GitHub: <b>Settings → Developer settings → Personal access tokens → Fine-grained tokens</b>,
+              acceso solo al repositorio <code>${esc(pub.repo || 'mr-lolo')}</code> y permiso
+              <b>Contents: Read and write</b>.
+            </span>
+          </div>
+          <button class="btn btn--primary btn--block" type="button" data-publicar>🚀 Publicar en la tienda</button>
+          ${pub.url ? `<p class="alert__pie">Después de publicar, mirá la tienda en <code>${esc(pub.url)}</code></p>` : ''}
+        </div>
+
         <div class="field">
-          <label>EXPORTAR PRODUCTOS Y CONFIGURACIÓN</label>
+          <label>SI PREFERÍS HACERLO A MANO</label>
           <span class="field__hint">
-            Descargá <code>data.js</code> y subilo al sitio para que los cambios los vean todos.
-            En GitHub se hace con <b>Add file → Upload files</b> (no hace falta pegar nada a mano).
+            Descargá <code>data.js</code> y subilo al repositorio con
+            <b>Add file → Upload files</b> (misma carpeta <code>assets/js</code>).
           </span>
         </div>
         <p class="admin__peso">
           <b>${Math.round(pesoConfig() / 1024)} KB</b> guardados en este navegador.
-          Las fotos que subís van incluidas en el <code>data.js</code>; cada una pesa unos 60 KB.
+          Con "Publicar", las fotos van como archivos aparte y <code>data.js</code> queda liviano.
         </p>
         <div class="dlg-actions">
-          <button class="btn btn--primary" type="button" data-exportar-data>⬇️ Descargar data.js</button>
+          <button class="btn btn--ghost" type="button" data-exportar-data>⬇️ Descargar data.js</button>
           <button class="btn btn--ghost" type="button" data-exportar-json>⬇️ Descargar copia JSON</button>
           <button class="btn btn--ghost" type="button" data-importar>⬆️ Importar copia JSON</button>
         </div>
@@ -1965,6 +2063,19 @@ function pintarPanelAdmin() {
       <h2 id="panel-titulo">⚙️ Panel de ${esc(estado.tienda.nombre)}</h2>
       <button class="dlg-close" type="button" data-cerrar aria-label="Cerrar">✕</button>
     </div>
+    ${estado.configVieja
+      ? `<div class="alert alert--stock">
+           <p><b>⚠️ Hay cambios guardados en este celular de una versión anterior</b></p>
+           <p class="alert__pie">
+             Para no pisar lo que se publicó después, no los aplicamos solos.
+             ¿Qué querés hacer?
+           </p>
+           <div class="dlg-actions">
+             <button class="btn btn--ghost" type="button" data-usar-local>Usar mis cambios de este celular</button>
+             <button class="btn btn--primary" type="button" data-descartar-local>Quedarme con lo publicado</button>
+           </div>
+         </div>`
+      : ''}
     <div class="cats" role="tablist" aria-label="Secciones del panel">
       ${tabs.map(([id, nombre]) => `<button type="button" role="tab" data-panel-tab="${id}" aria-selected="${panel.seccion === id}">${nombre}</button>`).join('')}
     </div>
@@ -1994,12 +2105,16 @@ function descargar(nombre, contenido, tipo = 'application/json') {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-function exportarDataJS() {
+/* Arma el contenido del archivo data.js. Se usa igual para descargarlo a mano
+   y para publicarlo en GitHub. */
+function construirDataJS(productos, revision) {
   const t = estado.tienda;
+  const pub = t.publicacion || {};
   const txt = (v) => `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-  const productos = estado.productos
+  const productos2 = (productos || estado.productos)
     .map(
       (p, i) => `  {
+    id: ${txt(idProducto(p, i))},
     orden: ${i + 1},
     nombre: ${txt(p.nombre)},
     precio: ${Number(p.precio) || 0},
@@ -2019,6 +2134,7 @@ export const TIENDA = {
   bajada: ${txt(t.bajada)},
   firma: ${txt(t.firma)},
   version: ${txt(t.version)},
+  revision: ${txt(revision || t.revision || '')},
   whatsapp: ${txt(t.whatsapp)},
   alias: ${txt(t.alias)},
   atiende: ${txt(t.atiende)},
@@ -2032,35 +2148,175 @@ export const TIENDA = {
   triviaSegundos: ${Number(t.triviaSegundos) || 20},
   triviaPorRonda: ${Number(t.triviaPorRonda) || 5},
   triviaRondasConPuntos: ${Number(t.triviaRondasConPuntos) || 2},
-  juego: ${Boolean(t.juego !== false)},
-  tetris: ${Boolean(t.tetris !== false)},
-  urlPublica: ${txt(t.urlPublica || '')},
-};
-`;
+   juego: ${Boolean(t.juego !== false)},
+   tetris: ${Boolean(t.tetris !== false)},
+   stockBajo: ${Number(t.stockBajo) || 3},
+   publicacion: {
+     usuario: ${txt(pub.usuario || '')},
+     repo: ${txt(pub.repo || '')},
+     rama: ${txt(pub.rama || 'main')},
+     url: ${txt(pub.url || '')},
+   },
+   urlPublica: ${txt(t.urlPublica || '')},
+ };
+ `;
 
-  /* Importante: el archivo exportado tiene que traer TODAS las exportaciones
-     de data.js (categorías y trivia incluidas). Si faltara alguna, al
-     reemplazar el archivo la tienda dejaría de cargar. */
-  const completo = `${cabecera}
-export const CATEGORIAS = ${JSON.stringify(CATEGORIAS, null, 2)};
+   /* Importante: el archivo exportado tiene que traer TODAS las exportaciones
+      de data.js (categorías y trivia incluidas). Si faltara alguna, al
+      reemplazar el archivo la tienda dejaría de cargar. */
+   return `${cabecera}
+ export const CATEGORIAS = ${JSON.stringify(CATEGORIAS, null, 2)};
 
-export const PRODUCTOS = [
-${productos}
-];
+ export const PRODUCTOS = [
+ ${productos2}
+ ];
 
-/* La trivia viaja tal cual: el panel de administración no la edita. */
-export const TRIVIA = ${JSON.stringify(TRIVIA, null, 2)};
-`;
+ /* La trivia viaja tal cual: el panel de administración no la edita. */
+ export const TRIVIA = ${JSON.stringify(TRIVIA, null, 2)};
+ `;
+ }
 
-  descargar('data.js', completo, 'text/javascript');
+function exportarDataJS() {
+  descargar('data.js', construirDataJS(), 'text/javascript');
   toast('data.js descargado ⬇️');
+}
+
+/* --------------------------------------------------------------------------
+   Aviso de stock bajo
+   -------------------------------------------------------------------------- */
+const umbralStock = () => Math.max(1, Number(estado.tienda.stockBajo) || 3);
+
+const productosConStockBajo = () =>
+  estado.productos.filter((p) => !agotado(p) && stockLimitado(p) && stockDe(p) <= umbralStock());
+
+function avisarStockPorWhatsApp() {
+  const bajos = productosConStockBajo();
+  if (!bajos.length) {
+    toast('Por ahora hay stock de todo 👌');
+    return;
+  }
+  const lineas = bajos.map((p) => `• ${p.nombre}: quedan ${stockDe(p)}`).join('\n');
+  const texto = `⚠️ ${estado.tienda.nombre} — se está por agotar:\n\n${lineas}\n\nHay que reponer antes del próximo recreo.`;
+  window.open(`https://wa.me/${estado.tienda.whatsapp}?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+  toast('Te abrimos el chat 📲', 3000);
+}
+
+/* --------------------------------------------------------------------------
+   Publicar en la tienda (GitHub) — pensado para hacerlo desde el celular
+   --------------------------------------------------------------------------
+   Primero sube las fotos nuevas como archivos aparte y después el data.js.
+   Así el archivo de datos queda liviano y la tienda carga rápido.
+   El token se guarda solo en este dispositivo y nunca se publica.          */
+const leerToken = () => almacen.get(CLAVES.token, '');
+
+/* base64 de un texto respetando los acentos y emoji (btoa solo toma latin1) */
+const aBase64 = (texto) => {
+  const bytes = new TextEncoder().encode(texto);
+  let bin = '';
+  bytes.forEach((b) => { bin += String.fromCharCode(b); });
+  return btoa(bin);
+};
+
+const urlContenido = (ruta) => {
+  const pub = estado.tienda.publicacion || {};
+  return `https://api.github.com/repos/${pub.usuario}/${pub.repo}/contents/${ruta}`;
+};
+
+async function apiGithub(url, opciones = {}) {
+  const token = leerToken();
+  if (!token) throw new Error('falta el token de GitHub');
+  const r = await fetch(url, {
+    ...opciones,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(opciones.headers || {}),
+    },
+  });
+  if (!r.ok) {
+    let detalle = `error ${r.status}`;
+    try {
+      const j = await r.json();
+      if (j && j.message) detalle = j.message;
+    } catch { /* sin detalle */ }
+    if (r.status === 401) detalle = 'el token no sirve o venció';
+    else if (r.status === 403) detalle = 'al token le falta el permiso "Contents: Read and write"';
+    else if (r.status === 404) detalle = 'no encontramos el repositorio o el archivo';
+    const err = new Error(detalle);
+    err.status = r.status;
+    throw err;
+  }
+  return r.status === 204 ? null : r.json();
+}
+
+async function subirArchivo(ruta, contenidoBase64, mensaje) {
+  const pub = estado.tienda.publicacion || {};
+  let sha;
+  try {
+    const actual = await apiGithub(`${urlContenido(ruta)}?ref=${pub.rama || 'main'}`);
+    sha = actual && actual.sha;
+  } catch (e) {
+    if (e.status !== 404) throw e;   // 404 = todavía no existe, se crea
+  }
+  return apiGithub(urlContenido(ruta), {
+    method: 'PUT',
+    body: JSON.stringify({
+      message: mensaje,
+      content: contenidoBase64,
+      branch: pub.rama || 'main',
+      ...(sha ? { sha } : {}),
+    }),
+  });
+}
+
+async function publicarTienda() {
+  const pub = estado.tienda.publicacion || {};
+  if (!pub.usuario || !pub.repo) { toast('Falta configurar el repositorio', 5000); return; }
+  if (!leerToken()) { toast('Primero pegá el token de GitHub 👇', 5000); return; }
+
+  const boton = $('[data-publicar]');
+  if (boton) { boton.disabled = true; boton.textContent = '⏳ Publicando…'; }
+
+  try {
+    const paraPublicar = [];
+    let fotos = 0;
+    for (const p of estado.productos) {
+      const copia = { ...p };
+      if (esFotoSubida(copia.imagen)) {
+        const ruta = `assets/img/foto-${idProducto(copia)}.webp`;
+        await subirArchivo(ruta, copia.imagen.split(',')[1], `Foto de ${copia.nombre}`);
+        copia.imagen = ruta;
+        fotos += 1;
+      }
+      paraPublicar.push(copia);
+    }
+
+    // Cada publicación deja una revisión nueva, así los demás dispositivos
+    // entienden que lo guardado acá ya quedó publicado.
+    const revision = new Date().toISOString();
+    await subirArchivo(
+      'assets/js/data.js',
+      aBase64(construirDataJS(paraPublicar, revision)),
+      'Actualizar precios, productos y fotos'
+    );
+    almacen.set(CLAVES.base, revision);
+    estado.configVieja = null;
+
+    toast(`¡Publicado! ${fotos ? fotos + ' foto(s) y ' : ''}los cambios. En 1 minuto lo ven todos ✅`, 7000);
+    pintarPanelAdmin();
+  } catch (e) {
+    toast(`No se pudo publicar: ${e.message}`, 8000);
+  } finally {
+    if (boton) { boton.disabled = false; boton.textContent = '🚀 Publicar en la tienda'; }
+  }
 }
 
 /* --------------------------------------------------------------------------
    Interacción global (delegación de eventos)
    -------------------------------------------------------------------------- */
 document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-cat],[data-agregar],[data-mas],[data-menos],[data-retiro],[data-enviar],[data-cerrar],[data-cerrar-trivia],[data-repetir],[data-copiar-alias],[data-copiar-pedido],[data-alias],[data-respuesta],[data-trivia-otra],[data-trivia-siguiente],[data-trivia-progreso],[data-juego],[data-imprimir],[data-panel-tab],[data-desbloquear],[data-guardar-panel],[data-mover],[data-duplicar],[data-agotar],[data-borrar],[data-agregar-producto],[data-alternar],[data-exportar-data],[data-exportar-json],[data-importar],[data-restablecer],[data-foto],[data-quitar-foto]');
+  const el = e.target.closest('[data-cat],[data-agregar],[data-mas],[data-menos],[data-retiro],[data-enviar],[data-cerrar],[data-cerrar-trivia],[data-repetir],[data-copiar-alias],[data-copiar-pedido],[data-alias],[data-respuesta],[data-trivia-otra],[data-trivia-siguiente],[data-trivia-progreso],[data-juego],[data-imprimir],[data-panel-tab],[data-desbloquear],[data-guardar-panel],[data-mover],[data-duplicar],[data-agotar],[data-borrar],[data-agregar-producto],[data-alternar],[data-exportar-data],[data-exportar-json],[data-importar],[data-restablecer],[data-foto],[data-quitar-foto],[data-avisar-stock],[data-publicar],[data-token],[data-usar-local],[data-descartar-local]');
   if (!el) return;
 
   const d = el.dataset;
@@ -2120,8 +2376,10 @@ document.addEventListener('click', (e) => {
     return;
   }
   if ('agregarProducto' in d) {
+    const n = estado.productos.length + 1;
     estado.productos.push({
-      orden: estado.productos.length + 1, nombre: 'Nueva golosina', precio: 500,
+      id: `producto-${Date.now().toString(36)}-${n}`,
+      orden: n, nombre: 'Nueva golosina', precio: 500,
       categoria: CATEGORIAS[0].id, imagen: 'assets/img/logo.svg', color: '#00B1EA', icono: '🍬',
       stock: null, agotado: false,
     });
@@ -2165,7 +2423,34 @@ document.addEventListener('click', (e) => {
     pintarPanelAdmin();
     return;
   }
-  if ('foto' in d) { raiz.querySelector(`[data-archivo-foto="${d.foto}"]`)?.click(); return; }
+  if ('foto' in d) {
+    // Ojo: acá había un error. Decía `raiz.querySelector` y `raiz` no existe
+    // fuera de los helpers, así que el clic lanzaba un error y no abría nada.
+    document.querySelector(`[data-archivo-foto="${d.foto}"]`)?.click();
+    return;
+  }
+  if ('avisarStock' in d) { avisarStockPorWhatsApp(); return; }
+  if ('publicar' in d) { publicarTienda(); return; }
+  if ('usarLocal' in d) {
+    if (!estado.configVieja) return;
+    aplicarGuardado(estado.configVieja);
+    estado.productos.forEach((p, i) => { if (!p.id) p.id = idProducto(p, i); });
+    estado.configVieja = null;
+    guardarConfig();
+    pintarTodo();
+    pintarPanelAdmin();
+    toast('Aplicamos los cambios de este celular ✅');
+    return;
+  }
+  if ('descartarLocal' in d) {
+    estado.configVieja = null;
+    almacen.set(CLAVES.config, 'null');
+    almacen.set(CLAVES.base, TIENDA.revision || '');
+    pintarTodo();
+    pintarPanelAdmin();
+    toast('Listo: quedó la versión publicada');
+    return;
+  }
   if ('quitarFoto' in d) {
     const i = Number(d.quitarFoto);
     const p = estado.productos[i];
@@ -2225,7 +2510,7 @@ document.addEventListener('input', (e) => {
     const campo = d.tienda;
     if (campo === 'whatsapp') estado.tienda.whatsapp = el.value.replace(/\D/g, '');
     else if (campo === 'retiro') estado.tienda.retiro = el.value.split(',').map((s) => s.trim()).filter(Boolean);
-    else if (['triviaSegundos', 'triviaPorRonda', 'triviaRondasConPuntos'].includes(campo)) {
+    else if (['triviaSegundos', 'triviaPorRonda', 'triviaRondasConPuntos', 'stockBajo'].includes(campo)) {
       estado.tienda[campo] = Number(el.value.replace(/\D/g, '')) || 0;
     } else estado.tienda[campo] = el.value;
     guardarConfig();
@@ -2247,6 +2532,20 @@ document.addEventListener('input', (e) => {
 /* --- Importar copia JSON --- */
 document.addEventListener('change', async (e) => {
   const input = e.target;
+
+  /* Token de GitHub: se guarda al salir del campo, no en cada tecla */
+  if ('token' in input.dataset) {
+    const valor = input.value.trim();
+    if (!valor) return;
+    if (almacen.set(CLAVES.token, valor)) {
+      input.value = '';
+      toast('Token guardado solo en este dispositivo 🔑');
+      pintarPanelAdmin();
+    } else {
+      toast('No pudimos guardar el token en este navegador', 5000);
+    }
+    return;
+  }
 
   /* Foto de producto subida desde el panel */
   if ('archivoFoto' in input.dataset) {
@@ -2414,6 +2713,21 @@ function iniciar() {
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').catch(() => { /* sin soporte */ });
+    });
+
+    /* Cuando entra una versión nueva del sitio, el Service Worker viejo puede
+       seguir sirviendo el programa anterior. Al cambiar el controlador,
+       recargamos una sola vez para que el celular quede al día sin que haya
+       que hacer nada a mano. */
+    let recargando = false;
+    try {
+      recargando = sessionStorage.getItem('mrlolo.recargue') === '1';
+    } catch { /* sin sessionStorage */ }
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (recargando) return;
+      recargando = true;
+      try { sessionStorage.setItem('mrlolo.recargue', '1'); } catch { /* nada */ }
+      location.reload();
     });
   }
 
