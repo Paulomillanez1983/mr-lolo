@@ -1,13 +1,34 @@
-# MR. LOLO — Tu tienda, lista para publicar
+# MR. LOLO — Tu tienda
 
-**Léelo una vez de arriba abajo. En 5 minutos la tenés online con HTTPS gratis.**
+## ✅ Ya está publicada, y funciona
 
-La carpeta `tienda-mr-lolo` **es** la tienda completa. No hay nada que instalar, ni
-que compilar, ni cuentas que configurar. Se sube tal cual está.
+**Link para compartir: https://paulomillanez1983.github.io/mr-lolo/**
+
+Con HTTPS gratis incluido. Ese es el link que Lorenzo manda a los grupos, a la familia
+y a los amigos. Está online en GitHub Pages, dentro de tu propia cuenta de GitHub
+(`Paulomillanez1983/mr-lolo`), así que podés actualizarla cuando quieras.
 
 ---
 
-## 1. Publicarla con HTTPS gratuito (paso a paso)
+## Cómo actualizar precios o productos (lo que vas a hacer seguido)
+
+1. Abrí la tienda, andá al pie de página y tocá **⚙️ Panel**.
+2. La clave es **2580**.
+3. Editá lo que quieras y tocá **💾 Guardar cambios**.
+4. Andá a la pestaña *Datos* y tocá **⬇️ Descargar data.js**.
+5. En GitHub, abrí el archivo `assets/js/data.js` y reemplazá su contenido:
+   entrá a `https://github.com/Paulomillanez1983/mr-lolo/blob/main/assets/js/data.js`,
+   tocá el lápiz ✏️, borrá todo, pegá lo que descargaste y guardá (*Commit changes*).
+6. En un minuto, la tienda online ya muestra los precios nuevos.
+
+---
+
+## Si algún día la querés mover a otro hosting
+
+La carpeta `tienda-mr-lolo` **es** la tienda completa. No hay nada que instalar ni que
+compilar: se sube tal cual está, y funciona igual en cualquier hosting estático.
+
+### Opción A — Netlify Drop (sin cuenta para empezar)
 
 ### Opción A — Netlify Drop (la más fácil, sin cuenta para empezar)
 
@@ -42,20 +63,20 @@ Funciona igual porque todas las rutas del sitio son relativas.
 
 ---
 
-## 2. Un toque final para que el link se vea lindo (2 minutos)
+## 2. El link ya está configurado para verse lindo (hecho)
 
-Cuando ya tengas la dirección definitiva, abrí el archivo `index.html` con cualquier editor
-de texto (Bloc de notas, Notepad++) y **buscá y reemplazá** `TU-DOMINIO` por tu dirección real,
-sin `https://` y sin barra al final.
+Cuando mandes `https://paulomillanez1983.github.io/mr-lolo/` por WhatsApp, va a aparecer
+una tarjeta con el logo, el nombre y los precios — no un link pelado. Eso ya quedó
+configurado en `index.html` (canonical, og:url, og:image, twitter:image y los datos para
+Google) y la imagen que se usa es `assets/img/portada.jpg`.
 
-Ejemplo: si tu tienda quedó en `https://mr-lolo-golosinas.netlify.app`, escribís
-`mr-lolo-golosinas.netlify.app`.
+**Solo tenés que volver a tocarlo si algún día cambiás de dirección.** En ese caso, en
+`index.html` buscá y reemplazá `paulomillanez1983.github.io/mr-lolo` por la dirección nueva,
+sin `https://` y sin barra al final. Son 7 apariciones: una es un comentario y las otras 6
+son los datos reales.
 
-Hay **7 apariciones**: una es un comentario que te lo recuerda y las otras 6 son los datos
-reales (canonical, og:url, og:image, twitter:image y los dos del bloque para Google).
-Reemplazalas todas. Volvés a subir el archivo y listo: cuando mandes el link por WhatsApp,
-va a aparecer la portada con el logo y los precios, en lugar de un link pelado. Para eso
-está la imagen `assets/img/portada.jpg`.
+> Ojo: hay que esperar unos minutos después de publicar para que WhatsApp refresque la
+> vista previa del link. Si ya lo mandaste antes, puede quedar cacheada la versión vieja.
 
 ---
 
@@ -190,8 +211,15 @@ Google quién visita la tienda de tu hijo) y funciona aunque el colegio tenga in
 
 ## 6. Cosas a tener en cuenta (te las digo derecho)
 
-- **No la publiqué yo**: para subirla hace falta tu cuenta. Está lista y probada; el paso 1
-  son 2 minutos y te puedo acompañar.
+- **Ya está publicada**: quedó online en `https://paulomillanez1983.github.io/mr-lolo/`,
+  dentro de tu cuenta de GitHub (`Paulomillanez1983/mr-lolo`), con HTTPS forzado y gratis.
+- **El repositorio es público**: GitHub Pages con HTTPS gratis solo funciona así en cuentas
+  gratuitas. Como la tienda es para compartir igual, no hay problema. Si algún día querés
+  que no se vea el código, hay que pasar a un plan pago de GitHub o mover el sitio a otro
+  hosting (Netlify o Cloudflare Pages, que sí permiten repositorios privados).
+- **El link de GitHub es largo**. Si querés algo más corto y lindo para el grupo de WhatsApp
+  (por ejemplo `mr-lolo-golosinas.netlify.app`), se puede mover el sitio a Netlify o
+  Cloudflare Pages en 5 minutos y queda igual de gratis. Avisame y lo hacemos.
 - **Verificá el WhatsApp y el alias**: los saqué tal cual de la app original
   (`5493516862674` y `LOLOMILLANEZ`). Si cambiaron, se editan en el Panel → *Tienda*.
 - **Si abrís `index.html` con doble clic** vas a ver un aviso: los módulos de JavaScript
