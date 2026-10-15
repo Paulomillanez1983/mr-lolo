@@ -46,7 +46,7 @@ const almacen = {
     } catch { return porDefecto; }
   },
   set(clave, valor) {
-    try { localStorage.setItem(clave, valor); } catch { /* modo privado */ }
+    try { localStorage.setItem(clave, valor); return true; } catch { return false; }
   },
   json(clave, porDefecto = null) {
     try {
@@ -69,7 +69,9 @@ const CLAVES = {
   puntos: 'mrlolo.puntos',
   triviaDia: 'mrlolo.triviaDia',
   triviaHechos: 'mrlolo.triviaHechos',
+  triviaStats: 'mrlolo.triviaStats',
   juegoRecord: 'mrlolo.juegoRecord',
+  tetrisRecord: 'mrlolo.tetrisRecord',
   panel: 'mrlolo.panelAbierto',
 };
 
@@ -98,6 +100,10 @@ function aplicarConfigGuardada() {
   if (Array.isArray(guardado.productos) && guardado.productos.length) estado.productos = guardado.productos;
   if (!estado.tienda.retiro?.includes(estado.retiro)) estado.retiro = estado.tienda.retiro[0];
 }
+
+/* Cuánto ocupa la configuración guardada en este navegador (las fotos subidas
+   desde el panel son las que más pesan, porque van dentro del guardado). */
+const pesoConfig = () => JSON.stringify({ tienda: estado.tienda, productos: estado.productos }).length;
 
 const guardarConfig = () =>
   almacen.set(CLAVES.config, JSON.stringify({ tienda: estado.tienda, productos: estado.productos }));
@@ -442,18 +448,25 @@ const hoy = () => {
 
 function pintarTrivia() {
   const cont = $('#trivia');
-  if (!estado.tienda.trivia) {
+  const hayTrivia = estado.tienda.trivia !== false;
+  const hayJuegos = estado.tienda.juego !== false || estado.tienda.tetris !== false;
+
+  if (!hayTrivia && !hayJuegos) {
     cont.hidden = true;
     return;
   }
   cont.hidden = false;
 
   const n = new Date();
-  const dia = TRIVIA[n.getDay()];
+  // El tema del día rota por los 15 temas: uno distinto cada día y, al
+  // terminar la vuelta, vuelve a empezar.
+  const inicio = new Date(n.getFullYear(), 0, 0);
+  const diasDelAnio = Math.floor((n - inicio) / 86400000);
+  const dia = TRIVIA[diasDelAnio % TRIVIA.length];
   const hechos = almacen.json(CLAVES.triviaHechos, {}) || {};
   const dow = (n.getDay() + 6) % 7;
 
-  $('#trivia-tema').textContent = `${dia.icono} ${dia.tema}`;
+  $('#trivia-tema').textContent = hayTrivia ? `${dia.icono} ${dia.tema}` : '🎮 Juegos';
 
   let cumplidos = 0;
   const semana = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'].map((letra, k) => {
@@ -464,7 +477,12 @@ function pintarTrivia() {
     return `<li${k === dow ? ' data-hoy' : ''}${ok ? ' data-ok' : ''}>${letra}${ok ? ' ✓' : ''}</li>`;
   });
   $('#trivia-semana').innerHTML = semana.join('');
-  $('#trivia-sub').textContent = `${estado.tienda.nombre} te pregunta · ${cumplidos}/7 días esta semana`;
+
+  const segundos = Number(estado.tienda.triviaSegundos) || 20;
+  const total = TRIVIA.reduce((s, t) => s + t.preguntas.length, 0);
+  $('#trivia-sub').textContent = hayTrivia
+    ? `${total} preguntas de ${TRIVIA.length} temas · ${segundos} s cada una · ${cumplidos}/7 días`
+    : 'Elegí un juego y sumá puntos';
 }
 /* --------------------------------------------------------------------------
    Pedido: armar el mensaje de WhatsApp
@@ -903,7 +921,95 @@ async function abrirCartel() {
    Trivia
    -------------------------------------------------------------------------- */
 let ronda = null;
-let tecleando = null;
+let tecleando = null;   // temporizador del efecto de escritura
+let avance = null;      // temporizador que pasa a la pregunta siguiente
+let reloj = null;       // cuenta regresiva de la pregunta actual
+
+/* --- Memoria del sistema adaptativo ---------------------------------------
+   Por cada pregunta guardamos cuántas veces la vio, cuántas acertó, si la
+   última vez la falló y cuándo fue. Con eso se decide qué preguntar. */
+const clavePregunta = (t, i) => `${t}:${i}`;
+
+const leerStats = () => almacen.json(CLAVES.triviaStats, {}) || {};
+
+const registrarRespuesta = (t, i, acerto) => {
+  const s = leerStats();
+  const k = clavePregunta(t, i);
+  const previo = s[k] || { v: 0, ok: 0, err: 0, racha: 0, ult: 0, okUlt: null };
+  previo.v += 1;
+  if (acerto) {
+    previo.ok += 1;
+    previo.racha = (previo.racha || 0) + 1;
+  } else {
+    previo.err += 1;
+    previo.racha = 0;
+  }
+  previo.ult = Date.now();
+  previo.okUlt = acerto;
+  s[k] = previo;
+  almacen.set(CLAVES.triviaStats, JSON.stringify(s));
+};
+
+/* Cuanto más alto el peso, más probable es que salga la pregunta.
+   La idea es la de un repaso espaciado: lo que fallás vuelve pronto,
+   lo que ya dominás aparece cada vez menos. */
+function pesoPregunta(s) {
+  const ahora = Date.now();
+  if (!s || !s.v) return 6;                    // nunca vista: prioridad alta
+  let peso = 3;
+  if (s.okUlt === false) peso += 6;            // la última vez la falló
+  peso += Math.min(s.err || 0, 4) * 1.5;       // errores acumulados
+  const dias = Math.pow(2, Math.min(s.racha || 0, 5));  // 1, 2, 4, 8, 16, 32 días
+  const vencida = ahora - (s.ult || 0) >= dias * 86400000;
+  peso += vencida ? 5 : -3;                    // toca repasar / todavía la tiene fresca
+  if ((s.racha || 0) >= 3) peso -= 4;          // ya la domina
+  return Math.max(0.4, peso);
+}
+
+/* Elige `cantidad` preguntas distintas de todos los temas, con sorteo
+   ponderado por `pesoPregunta`. */
+function elegirPreguntas(cantidad) {
+  const stats = leerStats();
+  const pozo = [];
+  TRIVIA.forEach((tema, t) => {
+    tema.preguntas.forEach((texto, i) => {
+      pozo.push({ t, i, texto, peso: pesoPregunta(stats[clavePregunta(t, i)]) });
+    });
+  });
+
+  const elegidas = [];
+  const usadas = new Set();
+  while (elegidas.length < cantidad && usadas.size < pozo.length) {
+    const libres = pozo.filter((p) => !usadas.has(clavePregunta(p.t, p.i)));
+    if (!libres.length) break;
+    const total = libres.reduce((suma, p) => suma + p.peso, 0);
+    let azar = Math.random() * total;
+    let elegido = libres[libres.length - 1];
+    for (const p of libres) {
+      azar -= p.peso;
+      if (azar <= 0) { elegido = p; break; }
+    }
+    usadas.add(clavePregunta(elegido.t, elegido.i));
+    elegidas.push(elegido);
+  }
+  return elegidas;
+}
+
+/* Resumen de aprendizaje por tema, para la pantalla de progreso. */
+function progresoPorTema() {
+  const stats = leerStats();
+  return TRIVIA.map((tema, t) => {
+    let vistas = 0;
+    let dominadas = 0;
+    tema.preguntas.forEach((_, i) => {
+      const s = stats[clavePregunta(t, i)];
+      if (!s || !s.v) return;
+      vistas += 1;
+      if ((s.racha || 0) >= 2) dominadas += 1;
+    });
+    return { icono: tema.icono, tema: tema.tema, total: tema.preguntas.length, vistas, dominadas };
+  });
+}
 
 const mezclar = (lista) => {
   const a = lista.slice();
@@ -935,30 +1041,40 @@ function iniciarTrivia() {
   const visto = almacen.json(CLAVES.triviaDia, null);
   const hecho = visto && visto.dia === hoyClave ? visto : { dia: hoyClave, indices: [], rondas: 0 };
 
-  const tema = TRIVIA[new Date().getDay()];
-  let disponibles = tema.preguntas.map((_, i) => i).filter((i) => !hecho.indices.includes(i));
-  if (disponibles.length < 5) {
-    hecho.indices = [];
-    disponibles = tema.preguntas.map((_, i) => i);
-  }
+  const conPuntos = hecho.rondas < (Number(estado.tienda.triviaRondasConPuntos) || 2);
+  const cantidad = Math.max(3, Math.min(10, Number(estado.tienda.triviaPorRonda) || 5));
+  const segundos = Math.max(5, Math.min(120, Number(estado.tienda.triviaSegundos) || 20));
 
-  const elegidas = mezclar(disponibles).slice(0, 5);
-  hecho.indices = [...hecho.indices, ...elegidas];
-  almacen.set(CLAVES.triviaDia, JSON.stringify(hecho));
+  // Cada ronda mezcla temas: las preguntas salen de todos, ponderadas por lo
+  // que te costó antes (ver `pesoPregunta`).
+  const seleccion = elegirPreguntas(cantidad);
 
   ronda = {
-    tema,
-    conPuntos: hecho.rondas < 2,
+    conPuntos,
+    segundos,
+    restante: segundos,
+    ultimoTic: null,
     indice: 0,
     correctas: 0,
     puntos: 0,
     bloqueado: true,
-    preguntas: elegidas.map((i) => {
-      const trozos = tema.preguntas[i].split('|');
-      const opciones = mezclar(trozos.slice(1));
-      return { texto: trozos[0], opciones, correcta: opciones.indexOf(trozos[1]) };
+    falladas: [],
+    preguntas: seleccion.map(({ t, i, texto }) => {
+      const trozos = texto.split('|');
+      const opciones = mezclar(trozos.slice(1, 5));
+      return {
+        t,
+        i,
+        tema: TRIVIA[t].tema,
+        icono: TRIVIA[t].icono,
+        texto: trozos[0],
+        opciones,
+        correcta: opciones.indexOf(trozos[1]),
+        dato: (trozos[5] || '').trim(),
+      };
     }),
   };
+
   hecho.rondas += 1;
   almacen.set(CLAVES.triviaDia, JSON.stringify(hecho));
 
@@ -966,32 +1082,84 @@ function iniciarTrivia() {
   abrirDialogo('dlg-trivia');
 }
 
+/* --- Reloj de la pregunta ------------------------------------------------- */
+function pararReloj() {
+  clearInterval(reloj);
+  reloj = null;
+}
+
+function pintarReloj() {
+  if (!ronda) return;
+  const pct = Math.max(0, Math.min(100, (ronda.restante / ronda.segundos) * 100));
+  const barra = $('#trivia-tiempo-barra');
+  const num = $('#trivia-tiempo');
+  const caja = $('#trivia-reloj');
+  if (barra) barra.style.width = pct + '%';
+  if (num) num.textContent = Math.ceil(ronda.restante);
+  if (caja) caja.dataset.estado = pct < 22 ? 'mal' : pct < 55 ? 'ojo' : 'bien';
+}
+
+function arrancarReloj() {
+  pararReloj();
+  if (!ronda) return;
+  ronda.restante = ronda.segundos;
+  ronda.ultimoTic = null;
+  pintarReloj();
+  reloj = setInterval(() => {
+    if (!ronda || ronda.bloqueado) { pararReloj(); return; }
+    ronda.restante -= 0.1;
+    if (ronda.restante <= 0) {
+      ronda.restante = 0;
+      pintarReloj();
+      pararReloj();
+      responder(-1);           // se acabó el tiempo: cuenta como fallada
+      return;
+    }
+    pintarReloj();
+    const s = Math.ceil(ronda.restante);
+    if (s <= 5 && s !== ronda.ultimoTic) {
+      ronda.ultimoTic = s;
+      sonar(280 + s * 45, 0.04, 'sawtooth');
+    }
+  }, 100);
+}
+
 function mostrarPregunta() {
   const q = ronda.preguntas[ronda.indice];
+  const total = ronda.preguntas.length;
   ronda.bloqueado = true;
+  pararReloj();
 
   $('#trivia-cuerpo').innerHTML = `
     <div class="qtop">
-      <span>${ronda.tema.icono} ${esc(ronda.tema.tema)}</span>
-      <span>${ronda.indice + 1}/5</span>
+      <span>${q.icono} ${esc(q.tema)}</span>
+      <span>${ronda.indice + 1}/${total}</span>
       <button class="dlg-close" type="button" data-cerrar-trivia aria-label="Cerrar">✕</button>
     </div>
-    <div class="qbar"><i style="width:${ronda.indice * 20}%"></i></div>
+    <div class="qbar"><i style="width:${Math.round((ronda.indice / total) * 100)}%"></i></div>
+    <div class="qtimer" id="trivia-reloj" data-estado="bien">
+      <div class="qtimer__bar"><i id="trivia-tiempo-barra" style="width:100%"></i></div>
+      <span class="qtimer__num"><b id="trivia-tiempo">${ronda.segundos}</b> s</span>
+    </div>
     <div class="qhost">
       <span class="qhost__face" id="trivia-cara"><svg viewBox="0 0 120 120" aria-hidden="true"><use href="#i-logo"/></svg></span>
       <span class="qhost__bubble" id="trivia-dialogo" aria-live="polite"></span>
     </div>
-    <div class="qopts" id="trivia-opciones"></div>
-    <p class="qfoot" id="trivia-puntos">${ronda.conPuntos ? `⭐ +${ronda.puntos} en esta ronda` : 'Modo práctica (sin puntos)'}</p>
+    <div class="qopts" id="trivia-opciones" aria-label="Respuestas"></div>
+    <p class="qfoot" id="trivia-puntos">${ronda.conPuntos ? `⭐ ${ronda.puntos} puntos en esta ronda` : 'Modo práctica (sin puntos)'}</p>
   `;
 
   hablar(q.texto);
+  // El tiempo arranca cuando aparecen las opciones: si no, escribir la
+  // pregunta ya te comería segundos.
   escribir($('#trivia-dialogo'), q.texto, () => {
     if (!ronda || ronda.preguntas[ronda.indice] !== q) return;
+    const letras = ['A', 'B', 'C', 'D'];
     $('#trivia-opciones').innerHTML = q.opciones
-      .map((o, i) => `<button type="button" data-respuesta="${i}">${esc(o)}</button>`)
+      .map((o, i) => `<button type="button" data-respuesta="${i}"><b>${letras[i] || '·'}</b><span>${esc(o)}</span></button>`)
       .join('');
     ronda.bloqueado = false;
+    arrancarReloj();
   });
 }
 
@@ -1014,16 +1182,34 @@ function escribir(el, texto, alTerminar) {
   }, 22);
 }
 
+/* Pasa a la pregunta siguiente (o termina la ronda). Se llama desde el botón
+   "Siguiente" y también solo, si el jugador no toca nada. */
+function siguientePregunta() {
+  if (!ronda || !ronda.esperando) return;
+  ronda.esperando = null;
+  clearTimeout(avance);
+  pararReloj();
+  ronda.indice += 1;
+  if (ronda.indice < ronda.preguntas.length) mostrarPregunta();
+  else terminarTrivia();
+}
+
 function responder(indice) {
   if (!ronda || ronda.bloqueado) return;
   ronda.bloqueado = true;
+  pararReloj();
 
   const q = ronda.preguntas[ronda.indice];
   const botones = $$('#trivia-opciones button');
-  const acerto = indice === q.correcta;
+  const sinTiempo = indice < 0;
+  const acerto = !sinTiempo && indice === q.correcta;
 
   botones[q.correcta]?.setAttribute('data-good', '');
-  if (!acerto) botones[indice]?.setAttribute('data-bad', '');
+  if (!acerto && !sinTiempo) botones[indice]?.setAttribute('data-bad', '');
+  botones.forEach((b) => b.setAttribute('disabled', ''));
+
+  registrarRespuesta(q.t, q.i, acerto);
+  if (!acerto) ronda.falladas.push(q);
 
   const cara = $('#trivia-cara');
   const dialogo = $('#trivia-dialogo');
@@ -1031,13 +1217,15 @@ function responder(indice) {
   if (acerto) {
     ronda.correctas += 1;
     if (ronda.conPuntos) {
-      const bonus = Date.now() - (ronda.t0 || Date.now()) < 6000 ? 5 : 0;
-      const suma = 10 + bonus;
+      const premioTiempo = Math.round(50 * (ronda.restante / ronda.segundos));
+      const suma = 100 + premioTiempo;
       ronda.puntos += suma;
       estado.puntos += suma;
       almacen.set(CLAVES.puntos, String(estado.puntos));
-      $('b', $('#puntos')).textContent = estado.puntos;
-      $('#trivia-puntos').textContent = `⭐ +${ronda.puntos} en esta ronda`;
+      const chip = $('#puntos b');
+      if (chip) chip.textContent = estado.puntos;
+      const pie = $('#trivia-puntos');
+      if (pie) pie.textContent = `⭐ +${suma} (${100} + ${premioTiempo} por rapidez) · ${ronda.puntos} en la ronda`;
     }
     cara?.style.setProperty('filter', 'drop-shadow(0 0 14px var(--g))');
     sonar(880, 0.06);
@@ -1046,41 +1234,82 @@ function responder(indice) {
   } else {
     cara?.style.setProperty('filter', 'grayscale(.4)');
     sonar(200, 0.2);
+    vibrar(30);
   }
 
   const elogios = ['¡Eso es! 🎉', '¡Genio! 🧠', '¡Perfecto! ✨', '¡Muy bien! 👏', '¡Sabés mucho! 😎'];
-  const respuesta = acerto ? elogios[Math.floor(Math.random() * elogios.length)] : `¡Casi! 😅 Era: ${q.opciones[q.correcta]}`;
-  if (dialogo) dialogo.textContent = respuesta;
-  hablar(respuesta);
+  const arranque = sinTiempo ? '¡Se acabó el tiempo! ⏰' : acerto ? elogios[Math.floor(Math.random() * elogios.length)] : '¡Casi! 😅';
+  const respuesta = `${arranque} Era: ${q.opciones[q.correcta]}`;
 
-  setTimeout(() => {
-    if (!ronda) return;
-    ronda.indice += 1;
-    if (ronda.indice < 5) mostrarPregunta();
-    else terminarTrivia();
-  }, 1500);
+  const cuerpo = $('#trivia-cuerpo');
+  const aviso = document.createElement('div');
+  aviso.className = `qteach ${acerto ? 'qteach--ok' : 'qteach--no'}`;
+  aviso.innerHTML = `
+    <p class="qteach__head">${esc(respuesta)}</p>
+    ${q.dato ? `<p class="qteach__dato">💡 ${esc(q.dato)}</p>` : ''}
+    <button class="btn ${acerto ? 'btn--ghost' : 'btn--primary'}" type="button" data-trivia-siguiente>
+      ${ronda.indice + 1 < ronda.preguntas.length ? 'Siguiente →' : 'Ver resultado 🏁'}
+    </button>
+  `;
+  cuerpo.append(aviso);
+  aviso.scrollIntoView({ block: 'nearest', behavior: quieto() ? 'auto' : 'smooth' });
+  if (dialogo) dialogo.textContent = arranque;
+  hablar(`${arranque} La respuesta correcta era ${q.opciones[q.correcta]}`);
+
+  // Si no toca nada, avanza solo: con dato da tiempo a leerlo.
+  ronda.esperando = acerto ? 3800 : 6500;
+  clearTimeout(avance);
+  avance = setTimeout(siguientePregunta, ronda.esperando);
 }
 
+const quieto = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function terminarTrivia() {
-  const perfecto = ronda.correctas === 5;
+  clearTimeout(avance);
+  pararReloj();
+  const totalPreguntas = ronda.preguntas.length;
+  const perfecto = ronda.correctas === totalPreguntas;
   let bonus = 0;
   if (perfecto && ronda.conPuntos) {
-    bonus = 20;
+    bonus = 200;
     estado.puntos += bonus;
     almacen.set(CLAVES.puntos, String(estado.puntos));
-    $('b', $('#puntos')).textContent = estado.puntos;
+    const chip = $('#puntos b');
+    if (chip) chip.textContent = estado.puntos;
   }
 
   const hechos = almacen.json(CLAVES.triviaHechos, {}) || {};
   hechos[hoy()] = 1;
   almacen.set(CLAVES.triviaHechos, JSON.stringify(hechos));
 
-  const confeti = Array.from({ length: perfecto ? 26 : 0 }, (_, g) => {
+  const confeti = Array.from({ length: perfecto ? 30 : ronda.correctas >= 3 ? 12 : 0 }, (_, g) => {
     const color = ['#FFE600', '#00B1EA', '#fff'][g % 3];
     return `<span style="position:fixed;top:-12px;left:${(g * 13) % 100}%;width:9px;height:9px;border-radius:2px;background:${color};animation:caer ${1.6 + (g % 5) * 0.25}s linear ${g * 40}ms forwards"></span>`;
   }).join('');
 
-  const titulo = perfecto ? '¡5 de 5! ¡Sos un crack! 🏆' : ronda.correctas >= 3 ? '¡Muy bien! 🎉' : '¡Buen intento! Mañana hay otro tema 💪';
+  const aprobado = ronda.correctas >= Math.ceil(totalPreguntas / 2);
+  const titulo = perfecto
+    ? `¡${totalPreguntas} de ${totalPreguntas}! ¡Sos un crack! 🏆`
+    : aprobado ? '¡Muy bien! 🎉' : '¡Buen intento! Lo volvemos a practicar 💪';
+
+  const repaso = ronda.falladas.length
+    ? `
+      <div class="repaso">
+        <p class="repaso__t">📌 Para repasar</p>
+        <ul>
+          ${ronda.falladas
+            .map(
+              (f) => `<li>
+                <b>${esc(f.texto)}</b>
+                <span>✅ ${esc(f.opciones[f.correcta])}</span>
+                ${f.dato ? `<em>💡 ${esc(f.dato)}</em>` : ''}
+              </li>`
+            )
+            .join('')}
+        </ul>
+        <p class="repaso__nota">Estas te van a volver a salir en las próximas rondas.</p>
+      </div>`
+    : '';
 
   $('#trivia-cuerpo').innerHTML = `
     ${confeti}
@@ -1089,17 +1318,19 @@ function terminarTrivia() {
         <svg viewBox="0 0 120 120" aria-hidden="true"><use href="#i-logo"/></svg>
       </div>
       <p style="font-weight:800;font-size:var(--fs-lg)">${titulo}</p>
-      <h2 style="margin:.4rem 0">${ronda.correctas} de 5 correctas</h2>
+      <h2 style="margin:.4rem 0">${ronda.correctas} de ${totalPreguntas} correctas</h2>
       <p style="font-size:var(--fs-2xl);color:var(--y);font-weight:800;margin:.3rem 0">
         ${ronda.conPuntos ? `+${ronda.puntos + bonus} ⭐` : 'Práctica'}
       </p>
       <p class="sheet__sub" style="margin-bottom:1rem">
         ${ronda.conPuntos
-          ? `Tenés ${estado.puntos} puntos en total. ¡Más adelante los vamos a usar para premios!`
-          : 'Hoy ya sumaste puntos en 2 rondas. ¡Volvé mañana por más!'}
+          ? `Tenés ${estado.puntos} puntos en total.${bonus ? ` ¡Sumaste ${bonus} extra por el ${totalPreguntas} de ${totalPreguntas}!` : ''}`
+          : `Hoy ya sumaste puntos en ${Number(estado.tienda.triviaRondasConPuntos) || 2} rondas. ¡Volvé mañana por más!`}
       </p>
+      ${repaso}
       <div class="dlg-actions">
         <button class="btn btn--primary" type="button" data-trivia-otra>🔁 Jugar otra vez</button>
+        <button class="btn btn--ghost" type="button" data-trivia-progreso>📊 Mi progreso</button>
         <button class="btn btn--ghost" type="button" data-cerrar-trivia>Seguir comprando</button>
       </div>
     </div>
@@ -1107,6 +1338,129 @@ function terminarTrivia() {
   ronda = null;
   pintarTrivia();
   sonar(660, 0.12);
+  if (perfecto) setTimeout(() => sonar(1320, 0.2), 200);
+}
+
+/* --- Pantalla de progreso: qué aprendiste y qué te falta ------------------ */
+function pintarProgreso() {
+  const filas = progresoPorTema();
+  const totalPreguntas = TRIVIA.reduce((s, t) => s + t.preguntas.length, 0);
+  const vistas = filas.reduce((s, f) => s + f.vistas, 0);
+  const dominadas = filas.reduce((s, f) => s + f.dominadas, 0);
+
+  const barras = filas
+    .map((f) => {
+      const pct = Math.round((f.dominadas / f.total) * 100);
+      return `
+      <li>
+        <span class="bar__t">${f.icono} ${esc(f.tema)}</span>
+        <span class="bar__b"><i style="width:${pct}%"></i></span>
+        <span class="bar__n">${f.dominadas}/${f.total}
+          <em>${f.vistas ? `${f.vistas} vista${f.vistas === 1 ? '' : 's'}` : 'sin estrenar'}</em>
+        </span>
+      </li>`;
+    })
+    .join('');
+
+  $('#trivia-cuerpo').innerHTML = `
+    <div class="dlg-head">
+      <h2 id="trivia-titulo">📊 Mi progreso</h2>
+      <button class="dlg-close" type="button" data-cerrar-trivia aria-label="Cerrar">✕</button>
+    </div>
+    <p class="prog__resumen">
+      <b>${dominadas}</b> preguntas dominadas de ${totalPreguntas}
+      <em>${vistas} ya vistas · ${(estado.puntos || 0)} puntos</em>
+    </p>
+    <p class="prog__nota">Una pregunta se marca dominada cuando la acertás 2 veces seguidas.
+      Las que te salen mal vuelven a aparecer antes que las demás.</p>
+    <ul class="barras">${barras}</ul>
+    <div class="dlg-actions">
+      <button class="btn btn--primary" type="button" data-trivia-otra>🧠 Jugar una ronda</button>
+      <button class="btn btn--ghost" type="button" data-cerrar-trivia>Listo</button>
+    </div>
+  `;
+}
+
+/* Corta la ronda en curso: al cerrar el diálogo o al empezar otra. */
+function terminarRonda() {
+  clearTimeout(avance);
+  pararReloj();
+  ronda = null;
+}
+
+/* --------------------------------------------------------------------------
+   Juegos: menú y Tetris
+   -------------------------------------------------------------------------- */
+let juegoTetris = null;
+
+function abrirJuegos() {
+  const t = estado.tienda;
+  const tarjetas = [];
+
+  if (t.juego !== false) {
+    const meta = Number(t.premio?.caramelos) || 0;
+    tarjetas.push(`
+      <button class="jcard" type="button" data-juego="caramelos">
+        <span class="jcard__ico">🍬</span>
+        <b>Lluvia de caramelos</b>
+        <small>Atrapá los caramelos que caen y esquivá el brócoli. 45 segundos.</small>
+        ${meta ? `<em>Premio: ${meta} puntos${t.premio?.texto ? ' → ' + esc(t.premio.texto) : ''}</em>` : ''}
+      </button>`);
+  }
+
+  if (t.tetris !== false) {
+    tarjetas.push(`
+      <button class="jcard" type="button" data-juego="tetris">
+        <span class="jcard__ico">🧱</span>
+        <b>Tetris de golosinas</b>
+        <small>Armá líneas con los caramelos y no dejes que se apilen. Se maneja con las flechas o con los botones.</small>
+        <em>Récord: ${almacen.get(CLAVES.tetrisRecord, '0')} puntos</em>
+      </button>`);
+  }
+
+  if (!tarjetas.length) {
+    toast('Los juegos están apagados por ahora');
+    return;
+  }
+
+  $('#juegos-cuerpo').innerHTML = `
+    <div class="dlg-head">
+      <h2 id="juegos-titulo">🎮 Juegos</h2>
+      <button class="dlg-close" type="button" data-cerrar aria-label="Cerrar">✕</button>
+    </div>
+    <div class="juegos">${tarjetas.join('')}</div>
+    <div class="dlg-actions">
+      <button class="btn btn--ghost" type="button" data-cerrar>Volver a la tienda</button>
+    </div>
+  `;
+  abrirDialogo('dlg-juegos');
+}
+
+async function abrirTetris() {
+  if (estado.tienda.tetris === false) {
+    toast('El Tetris está apagado por ahora');
+    return;
+  }
+  if (juegoTetris) {
+    juegoTetris.cerrar();
+    juegoTetris = null;
+  }
+  try {
+    // El módulo del Tetris se descarga recién ahora.
+    const { iniciarTetris } = await import('./tetris.js');
+    if (juego) cerrarJuego();
+    juegoTetris = iniciarTetris({
+      sonar,
+      vibrar,
+      premio: estado.tienda.premio,
+      atiende: estado.tienda.atiende,
+      recordInicial: Number(almacen.get(CLAVES.tetrisRecord, '0')) || 0,
+      alGuardarRecord: (r) => almacen.set(CLAVES.tetrisRecord, String(r)),
+      alSalir: () => { juegoTetris = null; },
+    });
+  } catch {
+    toast('No pudimos abrir el Tetris 😕');
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -1368,6 +1722,48 @@ const CLAVE_PIN = 'mrlolo.pin';
 
 let panel = { abierto: false, seccion: 'productos', desbloqueado: false };
 
+/* --- Fotos de producto ----------------------------------------------------
+   Las fotos que sube el dueño se achican en el navegador y se guardan como
+   data URI dentro de la configuración, así viajan con el data.js exportado. */
+const esFotoSubida = (v) => typeof v === 'string' && v.startsWith('data:image/');
+const sinDatos = (v) => (esFotoSubida(v) ? '' : v);
+
+const LADO_FOTO = 640;   // la tarjeta es más chica, pero así se ve nítida en pantallas grandes
+
+function comprimirFoto(archivo) {
+  return new Promise((resolver, rechazar) => {
+    const url = URL.createObjectURL(archivo);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const lienzo = document.createElement('canvas');
+        lienzo.width = LADO_FOTO;
+        lienzo.height = LADO_FOTO;
+        const c = lienzo.getContext('2d');
+        c.fillStyle = '#0B0F1C';
+        c.fillRect(0, 0, LADO_FOTO, LADO_FOTO);
+        // Recorte cuadrado centrado, para que todas las fichas se vean iguales.
+        const escala = Math.max(LADO_FOTO / img.width, LADO_FOTO / img.height);
+        const w = img.width * escala;
+        const h = img.height * escala;
+        c.drawImage(img, (LADO_FOTO - w) / 2, (LADO_FOTO - h) / 2, w, h);
+        let salida = lienzo.toDataURL('image/webp', 0.82);
+        if (!salida.startsWith('data:image/webp')) salida = lienzo.toDataURL('image/jpeg', 0.85);
+        URL.revokeObjectURL(url);
+        resolver(salida);
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        rechazar(err);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      rechazar(new Error('imagen ilegible'));
+    };
+    img.src = url;
+  });
+}
+
 const pinActual = () => almacen.get(CLAVE_PIN, PIN_POR_DEFECTO);
 
 function abrirPanel() {
@@ -1422,9 +1818,10 @@ function pintarPanelAdmin() {
           .map(
             (p, i) => `
           <div class="admin__row${agotado(p) ? ' admin__row--off' : ''}">
-            <div class="admin__thumb">
+            <button class="admin__thumb" type="button" data-foto="${i}" title="Cambiar la foto">
               <img src="${esc(p.imagen)}" alt="" width="76" height="76" loading="lazy">
-            </div>
+              <span class="admin__thumb-cam">📷</span>
+            </button>
             <div class="admin__fields">
               <input data-campo="nombre" data-i="${i}" value="${esc(p.nombre)}" placeholder="Nombre">
               <div class="admin__grid2">
@@ -1435,7 +1832,14 @@ function pintarPanelAdmin() {
                 <option value="">Sin categoría</option>
                 ${CATEGORIAS.map((c) => `<option value="${c.id}"${p.categoria === c.id ? ' selected' : ''}>${c.icono} ${esc(c.nombre)}</option>`).join('')}
               </select>
-              <input data-campo="imagen" data-i="${i}" value="${esc(p.imagen)}" placeholder="Ruta o URL de la foto">
+              <input data-campo="imagen" data-i="${i}" value="${esc(sinDatos(p.imagen))}" placeholder="…o pegá una ruta o URL de foto">
+              <div class="admin__foto-ayuda">
+                ${esFotoSubida(p.imagen)
+                  ? `<span class="ok">✅ Foto propia cargada</span>
+                     <button class="admin__link" type="button" data-quitar-foto="${i}">quitar</button>`
+                  : '<span>Sacale una foto a la golosina y subila con el 📷</span>'}
+              </div>
+              <input type="file" accept="image/*" data-archivo-foto="${i}" hidden>
               <div class="admin__acts">
                 <button type="button" data-mover="${i}:-1" aria-label="Subir">↑</button>
                 <button type="button" data-mover="${i}:1" aria-label="Bajar">↓</button>
@@ -1472,10 +1876,31 @@ function pintarPanelAdmin() {
         <div class="field"><label>AVISO PARA LOS CLIENTES</label><input data-tienda="aviso" value="${esc(t.aviso || '')}" placeholder="Ej: Hoy vendo en el 2° recreo"></div>
         <div class="field"><label>MOMENTOS DE RETIRO (SEPARADOS POR COMA)</label><input data-tienda="retiro" value="${esc((t.retiro || []).join(', '))}"></div>
         <div class="field"><label>TEXTO DEL PIE</label><input data-tienda="pieDePagina" value="${esc(t.pieDePagina)}"></div>
-        <div class="field"><label>VERSIÓN PUBLICADA</label><input data-tienda="version" value="${esc(t.version)}"></div>
         <div class="seg" style="margin-top:.3rem">
           <button type="button" data-alternar="abierta" aria-pressed="${t.abierta !== false}">${t.abierta !== false ? '🟢 Tienda abierta' : '🔒 Tienda cerrada'}</button>
-          <button type="button" data-alternar="trivia" aria-pressed="${Boolean(t.trivia)}">${t.trivia ? '🧠 Trivia activa' : '⏸️ Trivia apagada'}</button>
+          <button type="button" data-alternar="trivia" aria-pressed="${t.trivia !== false}">${t.trivia !== false ? '🧠 Trivia activa' : '⏸️ Trivia apagada'}</button>
+          <button type="button" data-alternar="juego" aria-pressed="${t.juego !== false}">${t.juego !== false ? '🍬 Caramelos activo' : '⏸️ Caramelos apagado'}</button>
+          <button type="button" data-alternar="tetris" aria-pressed="${t.tetris !== false}">${t.tetris !== false ? '🧱 Tetris activo' : '⏸️ Tetris apagado'}</button>
+        </div>
+        <div class="admin__grid2">
+          <div class="field">
+            <label>SEGUNDOS POR PREGUNTA</label>
+            <input data-tienda="triviaSegundos" type="text" inputmode="numeric" value="${t.triviaSegundos ?? 20}">
+          </div>
+          <div class="field">
+            <label>PREGUNTAS POR RONDA</label>
+            <input data-tienda="triviaPorRonda" type="text" inputmode="numeric" value="${t.triviaPorRonda ?? 5}">
+          </div>
+        </div>
+        <div class="admin__grid2">
+          <div class="field">
+            <label>RONDAS CON PUNTOS POR DÍA</label>
+            <input data-tienda="triviaRondasConPuntos" type="text" inputmode="numeric" value="${t.triviaRondasConPuntos ?? 2}">
+          </div>
+          <div class="field">
+            <label>VERSIÓN</label>
+            <input data-tienda="version" value="${esc(t.version)}">
+          </div>
         </div>
       </div>
     `;
@@ -1507,8 +1932,15 @@ function pintarPanelAdmin() {
       <div class="admin">
         <div class="field">
           <label>EXPORTAR PRODUCTOS Y CONFIGURACIÓN</label>
-          <span class="field__hint">Descargá <code>data.js</code> actualizado y reemplazá el archivo del sitio para que los cambios queden fijos para todos.</span>
+          <span class="field__hint">
+            Descargá <code>data.js</code> y subilo al sitio para que los cambios los vean todos.
+            En GitHub se hace con <b>Add file → Upload files</b> (no hace falta pegar nada a mano).
+          </span>
         </div>
+        <p class="admin__peso">
+          <b>${Math.round(pesoConfig() / 1024)} KB</b> guardados en este navegador.
+          Las fotos que subís van incluidas en el <code>data.js</code>; cada una pesa unos 60 KB.
+        </p>
         <div class="dlg-actions">
           <button class="btn btn--primary" type="button" data-exportar-data>⬇️ Descargar data.js</button>
           <button class="btn btn--ghost" type="button" data-exportar-json>⬇️ Descargar copia JSON</button>
@@ -1596,17 +2028,31 @@ export const TIENDA = {
   aviso: ${txt(t.aviso || '')},
   promo: { cantidad: ${Number(t.promo?.cantidad) || 0}, porcentaje: ${Number(t.promo?.porcentaje) || 0} },
   premio: { caramelos: ${Number(t.premio?.caramelos) || 0}, texto: ${txt(t.premio?.texto || '')} },
-  trivia: ${Boolean(t.trivia)},
+  trivia: ${Boolean(t.trivia !== false)},
+  triviaSegundos: ${Number(t.triviaSegundos) || 20},
+  triviaPorRonda: ${Number(t.triviaPorRonda) || 5},
+  triviaRondasConPuntos: ${Number(t.triviaRondasConPuntos) || 2},
   juego: ${Boolean(t.juego !== false)},
+  tetris: ${Boolean(t.tetris !== false)},
   urlPublica: ${txt(t.urlPublica || '')},
 };
 `;
 
-  descargar(
-    'data.js',
-    `${cabecera}\nexport const PRODUCTOS = [\n${productos}\n];\n`,
-    'text/javascript'
-  );
+  /* Importante: el archivo exportado tiene que traer TODAS las exportaciones
+     de data.js (categorías y trivia incluidas). Si faltara alguna, al
+     reemplazar el archivo la tienda dejaría de cargar. */
+  const completo = `${cabecera}
+export const CATEGORIAS = ${JSON.stringify(CATEGORIAS, null, 2)};
+
+export const PRODUCTOS = [
+${productos}
+];
+
+/* La trivia viaja tal cual: el panel de administración no la edita. */
+export const TRIVIA = ${JSON.stringify(TRIVIA, null, 2)};
+`;
+
+  descargar('data.js', completo, 'text/javascript');
   toast('data.js descargado ⬇️');
 }
 
@@ -1614,14 +2060,14 @@ export const TIENDA = {
    Interacción global (delegación de eventos)
    -------------------------------------------------------------------------- */
 document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-cat],[data-agregar],[data-mas],[data-menos],[data-retiro],[data-enviar],[data-cerrar],[data-cerrar-trivia],[data-repetir],[data-copiar-alias],[data-copiar-pedido],[data-alias],[data-respuesta],[data-trivia-otra],[data-imprimir],[data-panel-tab],[data-desbloquear],[data-guardar-panel],[data-mover],[data-duplicar],[data-agotar],[data-borrar],[data-agregar-producto],[data-alternar],[data-exportar-data],[data-exportar-json],[data-importar],[data-restablecer]');
+  const el = e.target.closest('[data-cat],[data-agregar],[data-mas],[data-menos],[data-retiro],[data-enviar],[data-cerrar],[data-cerrar-trivia],[data-repetir],[data-copiar-alias],[data-copiar-pedido],[data-alias],[data-respuesta],[data-trivia-otra],[data-trivia-siguiente],[data-trivia-progreso],[data-juego],[data-imprimir],[data-panel-tab],[data-desbloquear],[data-guardar-panel],[data-mover],[data-duplicar],[data-agotar],[data-borrar],[data-agregar-producto],[data-alternar],[data-exportar-data],[data-exportar-json],[data-importar],[data-restablecer],[data-foto],[data-quitar-foto]');
   if (!el) return;
 
   const d = el.dataset;
 
   // --- Cerrar diálogos ---
   if ('cerrar' in d) { el.closest('dialog')?.close(); return; }
-  if ('cerrarTrivia' in d) { cerrarDialogo('dlg-trivia'); return; }
+  if ('cerrarTrivia' in d) { terminarRonda(); cerrarDialogo('dlg-trivia'); return; }
 
   // --- Catálogo ---
   if ('cat' in d) { estado.categoria = d.cat; pintarCategorias(); pintarGrilla(); return; }
@@ -1639,7 +2085,17 @@ document.addEventListener('click', (e) => {
 
   // --- Trivia ---
   if ('respuesta' in d) { responder(Number(d.respuesta)); return; }
-  if ('triviaOtra' in d) { cerrarDialogo('dlg-trivia'); setTimeout(iniciarTrivia, 200); return; }
+  if ('triviaSiguiente' in d) { siguientePregunta(); return; }
+  if ('triviaProgreso' in d) { pintarProgreso(); return; }
+  if ('triviaOtra' in d) { terminarRonda(); cerrarDialogo('dlg-trivia'); setTimeout(iniciarTrivia, 200); return; }
+
+  // --- Juegos ---
+  if ('juego' in d) {
+    cerrarDialogo('dlg-juegos');
+    if (d.juego === 'tetris') setTimeout(abrirTetris, 160);
+    else setTimeout(iniciarJuego, 160);
+    return;
+  }
 
   // --- Panel ---
   if ('panelTab' in d) { panel.seccion = d.panelTab; pintarPanelAdmin(); return; }
@@ -1709,6 +2165,18 @@ document.addEventListener('click', (e) => {
     pintarPanelAdmin();
     return;
   }
+  if ('foto' in d) { raiz.querySelector(`[data-archivo-foto="${d.foto}"]`)?.click(); return; }
+  if ('quitarFoto' in d) {
+    const i = Number(d.quitarFoto);
+    const p = estado.productos[i];
+    if (!p) return;
+    p.imagen = PRODUCTOS[i]?.imagen || 'assets/img/logo.svg';
+    guardarConfig();
+    pintarTodo();
+    pintarPanelAdmin();
+    toast('Foto quitada');
+    return;
+  }
   if ('exportarData' in d) { exportarDataJS(); return; }
   if ('exportarJson' in d) {
     descargar('mr-lolo-copia.json', JSON.stringify({ tienda: estado.tienda, productos: estado.productos }, null, 2));
@@ -1757,7 +2225,9 @@ document.addEventListener('input', (e) => {
     const campo = d.tienda;
     if (campo === 'whatsapp') estado.tienda.whatsapp = el.value.replace(/\D/g, '');
     else if (campo === 'retiro') estado.tienda.retiro = el.value.split(',').map((s) => s.trim()).filter(Boolean);
-    else estado.tienda[campo] = el.value;
+    else if (['triviaSegundos', 'triviaPorRonda', 'triviaRondasConPuntos'].includes(campo)) {
+      estado.tienda[campo] = Number(el.value.replace(/\D/g, '')) || 0;
+    } else estado.tienda[campo] = el.value;
     guardarConfig();
     return;
   }
@@ -1776,9 +2246,37 @@ document.addEventListener('input', (e) => {
 
 /* --- Importar copia JSON --- */
 document.addEventListener('change', async (e) => {
-  if (e.target.id !== 'archivo-importar' || !e.target.files?.[0]) return;
+  const input = e.target;
+
+  /* Foto de producto subida desde el panel */
+  if ('archivoFoto' in input.dataset) {
+    const i = Number(input.dataset.archivoFoto);
+    const p = estado.productos[i];
+    const archivo = input.files?.[0];
+    if (!p || !archivo) return;
+    toast('Procesando la foto…', 1500);
+    const previa = p.imagen;
+    try {
+      p.imagen = await comprimirFoto(archivo);
+      if (guardarConfig()) {
+        pintarTodo();
+        pintarPanelAdmin();
+        toast('Foto actualizada ✅');
+      } else {
+        p.imagen = previa;
+        guardarConfig();
+        toast('No hay espacio en este navegador para esa foto. Probá con una más chica o quitá otra.', 5000);
+      }
+    } catch {
+      toast('No pudimos leer esa imagen');
+    }
+    input.value = '';
+    return;
+  }
+
+  if (input.id !== 'archivo-importar' || !input.files?.[0]) return;
   try {
-    const texto = await e.target.files[0].text();
+    const texto = await input.files[0].text();
     const datos = JSON.parse(texto);
     if (datos.tienda) Object.assign(estado.tienda, datos.tienda);
     if (Array.isArray(datos.productos)) estado.productos = datos.productos;
@@ -1796,7 +2294,11 @@ document.addEventListener('change', async (e) => {
    Botones principales
    -------------------------------------------------------------------------- */
 $('#btn-pedido').addEventListener('click', abrirPedido);
-$('#btn-trivia').addEventListener('click', iniciarTrivia);
+$('#btn-trivia').addEventListener('click', () => {
+  if (estado.tienda.trivia === false) { abrirJuegos(); return; }
+  iniciarTrivia();
+});
+$('#btn-juegos').addEventListener('click', abrirJuegos);
 $('#btn-copiar-alias').addEventListener('click', () => copiar(estado.tienda.alias, 'Alias copiado ✅'));
 $('#btn-compartir').addEventListener('click', compartirTienda);
 $('#btn-cartel').addEventListener('click', abrirCartel);
@@ -1827,12 +2329,11 @@ $('#btn-logo').addEventListener('click', (e) => {
   clearTimeout(temporizadorToques);
   toques = 0;
   boton.querySelector('.bub')?.remove();
-  if (estado.tienda.juego === false) {
-    toast('El juego está apagado por ahora');
-    return;
-  }
-  iniciarJuego();
+  abrirJuegos();
 });
+
+/* Al cerrar el diálogo de trivia (con Esc o con la ✕) se corta el tiempo. */
+$('#dlg-trivia').addEventListener('close', terminarRonda);
 
 function saludar(boton) {
   boton.querySelector('.bub')?.remove();

@@ -8,18 +8,31 @@ Con HTTPS gratis incluido. Ese es el link que Lorenzo manda a los grupos, a la f
 y a los amigos. Está online en GitHub Pages, dentro de tu propia cuenta de GitHub
 (`Paulomillanez1983/mr-lolo`), así que podés actualizarla cuando quieras.
 
+**Versión 3.0** — se sumaron: trivia con **cronómetro** y **120 preguntas** en 15 temas,
+un sistema que **aprende de tus errores** (tipo Preguntados) con pantalla de progreso,
+un **Tetris de golosinas** y **carga de fotos de productos** desde el panel.
+
 ---
 
-## Cómo actualizar precios o productos (lo que vas a hacer seguido)
+## Cómo actualizar precios, productos y fotos (lo que vas a hacer seguido)
 
 1. Abrí la tienda, andá al pie de página y tocá **⚙️ Panel**.
 2. La clave es **2580**.
-3. Editá lo que quieras y tocá **💾 Guardar cambios**.
-4. Andá a la pestaña *Datos* y tocá **⬇️ Descargar data.js**.
-5. En GitHub, abrí el archivo `assets/js/data.js` y reemplazá su contenido:
-   entrá a `https://github.com/Paulomillanez1983/mr-lolo/blob/main/assets/js/data.js`,
-   tocá el lápiz ✏️, borrá todo, pegá lo que descargaste y guardá (*Commit changes*).
-6. En un minuto, la tienda online ya muestra los precios nuevos.
+3. En la pestaña *Productos* podés cambiar nombre, precio, stock y categoría, agregar
+   golosinas nuevas, reordenarlas o marcarlas como agotadas.
+4. **Para cambiar la foto**: tocá el 📷 que está sobre la miniatura y elegí una foto del
+   celular o de la compu. La tienda la recorta cuadrada y la achica sola (queda en unos
+   60 KB), así que podés sacarle la foto a la golosina con el teléfono y subirla directo.
+5. Tocá **💾 Guardar cambios**.
+6. Andá a la pestaña *Datos* y tocá **⬇️ Descargar data.js**.
+7. Subilo a GitHub: entrá a
+   `https://github.com/Paulomillanez1983/mr-lolo/tree/main/assets/js`, tocá **Add file →
+   Upload files**, arrastrá el `data.js` que descargaste y confirmá con **Commit changes**.
+   (Si subís un archivo con el mismo nombre, reemplaza al anterior.)
+8. En un minuto, la tienda online ya muestra todo nuevo. 🎉
+
+> Las fotos que subís van **dentro** del `data.js`. Por eso conviene que sean fotos
+> normales de celular y no imágenes gigantes: así el archivo pesa poco y sube rápido.
 
 ---
 
@@ -27,8 +40,6 @@ y a los amigos. Está online en GitHub Pages, dentro de tu propia cuenta de GitH
 
 La carpeta `tienda-mr-lolo` **es** la tienda completa. No hay nada que instalar ni que
 compilar: se sube tal cual está, y funciona igual en cualquier hosting estático.
-
-### Opción A — Netlify Drop (sin cuenta para empezar)
 
 ### Opción A — Netlify Drop (la más fácil, sin cuenta para empezar)
 
@@ -126,6 +137,49 @@ imagen en `assets/img/` y escribí la ruta). No hace falta tocar nada más.
 
 ---
 
+## 3.5. La trivia y los juegos, explicados (nuevo en la versión 3.0)
+
+### La trivia ahora enseña
+- **15 temas y 120 preguntas** (antes eran 7 temas y 56 preguntas).
+- Cada ronda mezcla preguntas de **todos** los temas, así nunca es siempre lo mismo.
+- Tenés **20 segundos** por pregunta (se cambia desde el Panel, si querés más o menos).
+- Cuanto más rápido contestás, más puntos: **100 por acierto + hasta 50 por velocidad**.
+  Las primeras 2 rondas del día suman puntos; después se juega en modo práctica.
+- Al responder te dice **cuál era la respuesta correcta y un dato para aprender**.
+- Al final de la ronda te arma una lista **"📌 Para repasar"** con las que fallaste.
+
+### El sistema que aprende con vos (tipo Preguntados)
+La trivia guarda en el navegador cómo te fue en cada pregunta y después elige sola:
+
+| Situación de la pregunta | Qué hace |
+|---|---|
+| Nunca te la preguntó | Aparece seguido |
+| La fallaste la última vez | Vuelve pronto, es prioridad |
+| La fallaste varias veces | Aumenta la prioridad |
+| La acertaste 2 veces seguidas | Se marca **dominada** y aparece menos |
+| Pasó mucho tiempo sin verla | Vuelve, para que no se te olvide |
+
+Es el mismo principio del **repaso espaciado**: los intervalos se van duplicando
+(1 día, 2, 4, 8…). En **📊 Mi progreso** (dentro de la trivia) ves las barras por tema,
+cuántas preguntas dominaste y cuántas te faltan.
+
+### Los dos juegos
+- **🍬 Lluvia de caramelos**: atrapá los caramelos y esquivá el brócoli. 45 segundos, 3 vidas.
+- **🧱 Tetris de golosinas**: el clásico, con caramelos de colores. 10×18 casilleros,
+  líneas que se borran y velocidad que sube por nivel. Se maneja con las **flechas**
+  (← → mover, ↑ girar, ↓ bajar, espacio soltar, P pausa) o con los **botones grandes**
+  de abajo, pensados para el celular.
+
+Los dos guardan tu **récord** en el propio dispositivo. Se abren desde el pie de página
+(**🎮 Juegos**) o con dos toques seguidos en el logo de Mr. LOLO.
+
+### Si querés apagar algo
+En el Panel → *Tienda* tenés los interruptores para apagar la trivia, la lluvia de
+caramelos o el Tetris, y los campos para cambiar los segundos por pregunta, cuántas
+preguntas por ronda y cuántas rondas por día suman puntos.
+
+---
+
 ## 4. Qué se mejoró respecto de la versión anterior
 
 ### 🎨 Visual
@@ -199,6 +253,9 @@ Google quién visita la tienda de tu hijo) y funciona aunque el colegio tenga in
 - **Las fotos reales** de cada producto (las mismas de la versión original, optimizadas).
 - **WhatsApp +54 9 351 686-2674** y **alias de Mercado Pago LOLOMILLANEZ**.
 - **El mensaje de pedido** con el mismo formato (productos, total, nombre, retiro, comentarios).
+- **La trivia completa**: las 56 preguntas originales siguen ahí, con su tema y su respuesta
+  correcta. A la versión 3.0 se le agregaron 64 más (15 temas en total), un dato para aprender
+  en cada una y el cronómetro. Nada se borró.
 - **Retiro en el cole**: Primer recreo · Segundo recreo · A la salida.
 - **La trivia**: 7 temas, uno por día (cultura general, capitales, matemática, animales,
   historia argentina, deportes y geografía), 8 preguntas por tema, 5 al azar por ronda,
@@ -226,7 +283,7 @@ Google quién visita la tienda de tu hijo) y funciona aunque el colegio tenga in
   necesitan `http(s)`. Para verla en tu compu hay que publicarla o levantarla con un servidor
   local (`python -m http.server` dentro de la carpeta).
 - **Al reemplazar archivos en el hosting**, subí el número `VERSION` en `sw.js`
-  (por ejemplo de `mrlolo-v2` a `mrlolo-v3`). Así los celulares que ya visitaron la tienda
+  (hoy dice `mrlolo-v3`; pasalo a `mrlolo-v4`). Así los celulares que ya visitaron la tienda
   descartan la copia vieja. Con los precios ya se refresca solo, pero es buena práctica.
 - **La clave del Panel (2580) no es seguridad real**: es solo para que los chicos no cambien
   los precios en su propio celular. Cualquiera con conocimientos puede leer el código.
@@ -247,11 +304,42 @@ tienda-mr-lolo/
 └── assets/
     ├── css/app.css         ← estilos, en capas (@layer)
     ├── js/
-    │   ├── data.js         ← ⭐ ACÁ se editan productos y precios
-    │   ├── app.js          ← la lógica (carrito, pedido, trivia, juego, panel)
+    │   ├── data.js         ← ⭐ ACÁ se editan productos, precios y la trivia
+    │   ├── app.js          ← la lógica (carrito, pedido, trivia, juegos, panel)
+    │   ├── tetris.js       ← el Tetris (se descarga solo si lo abrís)
     │   └── qr.js           ← generador de códigos QR propio
     └── img/                ← fotos de productos, logo e íconos
 ```
+
+---
+
+## 8. Recursos gratuitos: qué usa la tienda
+
+Preguntaste si se pueden usar recursos gratuitos. La respuesta corta: **la tienda ya está
+construida para no necesitar ninguno externo**, y eso es a propósito.
+
+| Recurso | Qué usa la tienda | Por qué |
+|---|---|---|
+| Hosting + HTTPS | GitHub Pages (tu cuenta) | Gratis, con candado de seguridad |
+| Tipografías | Las del propio dispositivo | Cero descargas, cero demoras, sin licencias que revisar |
+| Iconos y dibujos | Emoji del sistema + el logo en SVG hecho a medida | No hay que comprar ni atribuir nada |
+| Sonidos | Generados con el navegador (Web Audio) | No hay archivos de audio ni derechos de autor |
+| Código QR | Generador propio | Antes venía de un servicio externo; ahora no depende de nadie |
+| Fotos | Las de ustedes | 100% propias |
+
+**¿Y si más adelante quieren agregar cosas?** Todo lo que se puede usar gratis y sin
+problemas legales:
+
+- **Fotos e imágenes**: Pixabay y Unsplash (licencias que permiten uso libre, incluido
+  comercial). Para las fotos de las golosinas, lo mejor sigue siendo la foto real.
+- **Sonidos**: Freesound y Pixabay Audio (muchos son de dominio público o CC0).
+- **Tipografías**: Google Fonts (licencia OFL, se pueden usar comercialmente). Igual, para
+  este caso conviene quedarse con las del sistema: no hay descargas.
+- **Íconos**: cualquiera de licencia OFL/CC0.
+
+La regla práctica: si el recurso dice **CC0, dominio público u OFL**, se puede usar sin
+pedir permiso. Si dice **CC-BY**, se puede usar pero hay que dar el crédito. Y si dice
+**"solo uso personal"**, mejor no usarlo en una tienda.
 
 ---
 

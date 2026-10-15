@@ -2,7 +2,9 @@
    MR. LOLO — Service Worker
    --------------------------------------------------------------------------
    Hace que la tienda abra al instante en la segunda visita y funcione sin
-   conexión.    Estrategia (prioriza que los precios siempre estén al día):
+   conexión.
+
+   Estrategia (prioriza que los precios siempre estén al día):
 
      · Navegación, HTML, JS, CSS y manifest
                    → red primero, caché como respaldo. Si cambiás un precio
@@ -17,7 +19,7 @@
    que ya visitaron la tienda descarten la caché anterior.
    ========================================================================== */
 
-const VERSION = 'mrlolo-v2';
+const VERSION = 'mrlolo-v3';
 const CACHE = `${VERSION}-estaticos`;
 
 const BASE = new URL('./', self.location);
@@ -32,6 +34,7 @@ const ESENCIALES = [
   url('assets/js/app.js'),
   url('assets/js/data.js'),
   url('assets/js/qr.js'),
+  url('assets/js/tetris.js'),
   url('assets/img/logo.svg'),
   url('assets/img/icono-192.png'),
   url('assets/img/alfajor-havanna.webp'),
