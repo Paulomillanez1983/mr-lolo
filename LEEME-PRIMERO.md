@@ -8,9 +8,17 @@ Con HTTPS gratis incluido. Ese es el link que Lorenzo manda a los grupos, a la f
 y a los amigos. Está online en GitHub Pages, dentro de tu propia cuenta de GitHub
 (`Paulomillanez1983/mr-lolo`), así que podés actualizarla cuando quieras.
 
-**Versión 3.0** — se sumaron: trivia con **cronómetro** y **120 preguntas** en 15 temas,
-un sistema que **aprende de tus errores** (tipo Preguntados) con pantalla de progreso,
-un **Tetris de golosinas** y **carga de fotos de productos** desde el panel.
+**Versión 3.1** — ahora se puede **cargar fotos desde el celular** (estaba roto: el botón
+lanzaba un error y no pasaba nada), **publicar los cambios con un toque** sin salir de la
+tienda, y la tienda **avisa cuando una golosina se está por agotar**.
+
+Versión 3.0 — trivia con **cronómetro** y **120 preguntas** en 15 temas, un sistema que
+**aprende de tus errores** (tipo Preguntados) con pantalla de progreso, y un
+**Tetris de golosinas**.
+
+> **Si el celular ya tenía la tienda abierta antes:** después de una actualización puede
+> hacer falta **recargar dos veces** para que entre la versión nueva. Es normal: la primera
+> carga todavía usa el programa viejo guardado. Después se actualiza solo.
 
 ---
 
@@ -20,19 +28,23 @@ un **Tetris de golosinas** y **carga de fotos de productos** desde el panel.
 2. La clave es **2580**.
 3. En la pestaña *Productos* podés cambiar nombre, precio, stock y categoría, agregar
    golosinas nuevas, reordenarlas o marcarlas como agotadas.
-4. **Para cambiar la foto**: tocá el 📷 que está sobre la miniatura y elegí una foto del
-   celular o de la compu. La tienda la recorta cuadrada y la achica sola (queda en unos
-   60 KB), así que podés sacarle la foto a la golosina con el teléfono y subirla directo.
+4. **Para cambiar la foto**: tocá **📷 Subir foto** y elegí la cámara o la galería del
+   teléfono. La tienda la recorta cuadrada y la achica sola (unos 60 KB).
 5. Tocá **💾 Guardar cambios**.
-6. Andá a la pestaña *Datos* y tocá **⬇️ Descargar data.js**.
-7. Subilo a GitHub: entrá a
-   `https://github.com/Paulomillanez1983/mr-lolo/tree/main/assets/js`, tocá **Add file →
-   Upload files**, arrastrá el `data.js` que descargaste y confirmá con **Commit changes**.
-   (Si subís un archivo con el mismo nombre, reemplaza al anterior.)
-8. En un minuto, la tienda online ya muestra todo nuevo. 🎉
+6. Tocá **🚀 Publicar en la tienda** (pestaña *Datos*). En un minuto lo ven todos. 🎉
 
-> Las fotos que subís van **dentro** del `data.js`. Por eso conviene que sean fotos
-> normales de celular y no imágenes gigantes: así el archivo pesa poco y sube rápido.
+*(La primera vez hay que pegar un token de GitHub — está explicado en el punto 3.2 de esta guía.)*
+
+### El camino a mano (por si algún día no hay internet o falla el token)
+
+1. Panel → *Datos* → **⬇️ Descargar data.js**.
+2. Entrá a `https://github.com/Paulomillanez1983/mr-lolo/tree/main/assets/js`, tocá
+   **Add file → Upload files**, arrastrá el `data.js` descargado y confirmá con
+   **Commit changes** (si subís el mismo nombre, reemplaza al anterior).
+
+> En ese archivo las fotos van **dentro**, así que pesa más. Si vas a mandar muchas
+> fotos, mejor usá el botón **🚀 Publicar**: las sube como archivos aparte y la tienda
+> queda más liviana para los compradores.
 
 ---
 
@@ -134,6 +146,87 @@ de precios, el carrito y el mensaje de WhatsApp.
 
 Para una golosina nueva: copiá un bloque, cambiá el nombre, el precio y la foto (poné la
 imagen en `assets/img/` y escribí la ruta). No hace falta tocar nada más.
+
+---
+
+## 3.2. Publicar desde el celular (un solo toque) — nuevo en la 3.1
+
+Antes, para que los cambios los vieran los compradores había que descargar un archivo y
+subirlo a mano a GitHub. Ahora se hace desde la misma tienda.
+
+### Configurarlo una sola vez
+
+1. Abrí el Panel (pie de página → **⚙️ Panel**, clave **2580**) y andá a la pestaña **💾 Datos**.
+2. Creá un **token de GitHub**: entrá a GitHub → foto de perfil → *Settings* → *Developer
+   settings* → *Personal access tokens* → **Fine-grained tokens** → *Generate new token*.
+   - **Repository access**: *Only select repositories* → elegí **mr-lolo**.
+   - **Permissions** → *Repository permissions* → **Contents: Read and write**.
+   - Generá el token y copialo (empieza con `github_pat_`).
+3. Pegalo en el campo **TOKEN** del panel y salí del campo. Se guarda **solo en ese celular**.
+
+> Es como la llave de la tienda: quien la tenga puede cambiar el contenido del repositorio.
+> Guardala solo en el teléfono de ustedes y no la compartas.
+
+### Usarlo
+
+Cada vez que cambies precios, fotos o productos:
+
+1. Tocá **💾 Guardar cambios**.
+2. Tocá **🚀 Publicar en la tienda**.
+3. Esperá el mensaje "¡Publicado!". **En un minuto lo ven todos** los que abran el link.
+
+Se publican las **fotos como archivos aparte** y el `data.js` liviano, así la tienda carga
+rápido. Si algo falla, el mensaje te dice qué pasó (por ejemplo, si el token venció).
+
+### Si algún día aparece este aviso
+
+> ⚠️ *Hay cambios guardados en este celular de una versión anterior*
+
+Significa que en ese teléfono quedaron cambios sin publicar y que la tienda se actualizó
+desde otro lado. La tienda **no pisa nada sola**: te deja elegir entre
+**"Usar mis cambios de este celular"** (los aplica para que los revises y publiques) o
+**"Quedarme con lo publicado"** (los descarta). Elegí según cuál sea el más nuevo.
+
+---
+
+## 3.3. Aviso de que se está por agotar — nuevo en la 3.1
+
+En el Panel → *Productos*, cuando una golosina queda con **3 unidades o menos** (el número se
+cambia en la pestaña *Tienda*, campo *Avisar stock bajo con*), aparece un recuadro naranja:
+
+> ⚠️ **1 golosina por agotarse** — Alfajor Havanna (2)
+> [ 📲 Avisarme por WhatsApp ]
+
+Ese botón te abre un chat con vos mismo (WhatsApp a tu propio número) con la lista ya
+escrita, así te queda anotado y lo reenviás a quien repone. En la fila del producto también
+se ve **"¡Quedan 2!"**.
+
+**Y hay algo más útil todavía:** cuando un comprador hace un pedido que incluye algo con
+stock bajo, **el mensaje que te llega por WhatsApp ya trae el aviso**:
+
+```
+⚠️ OJO — se está por agotar:
+• Alfajor Havanna: quedan 2
+```
+
+Así te enterás en el mismo momento en que entra el pedido, sin tener que mirar el panel.
+
+> **Ojo con esto:** la aplicación no sabe cuántas unidades vendiste de verdad, porque los
+> pedidos llegan por WhatsApp y no por la web. El stock lo mantenés vos: después de repartir
+> un recreo, entrá al panel y anotá lo que queda. La tienda te ayuda avisándote, pero el
+> número final es tuyo.
+
+---
+
+## 3.4. Cómo se cambia una foto desde el celular — nuevo en la 3.1
+
+En el Panel → *Productos*:
+
+1. Tocá **📷 Subir foto** (o el cuadradito 📷 sobre la miniatura).
+2. Elegí **Cámara** para sacarle la foto a la golosina en el momento, o **Galería** si ya la tenés.
+3. La tienda la **recorta cuadrada y la achica** sola (~60 KB), así no gasta datos de nadie.
+4. Aparece un **✅** y el botón pasa a decir **"Cambiar foto"**. Para volver a la anterior, tocá **"quitar"**.
+5. Tocá **💾 Guardar cambios** y después **🚀 Publicar en la tienda**.
 
 ---
 
@@ -283,8 +376,10 @@ Google quién visita la tienda de tu hijo) y funciona aunque el colegio tenga in
   necesitan `http(s)`. Para verla en tu compu hay que publicarla o levantarla con un servidor
   local (`python -m http.server` dentro de la carpeta).
 - **Al reemplazar archivos en el hosting**, subí el número `VERSION` en `sw.js`
-  (hoy dice `mrlolo-v3`; pasalo a `mrlolo-v4`). Así los celulares que ya visitaron la tienda
+  (hoy dice `mrlolo-v5`; pasalo a `mrlolo-v6`). Así los celulares que ya visitaron la tienda
   descartan la copia vieja. Con los precios ya se refresca solo, pero es buena práctica.
+  Desde la 3.1 la tienda además **se recarga sola** la primera vez que detecta una versión
+  nueva, así que los cambios llegan sin que nadie tenga que hacer nada.
 - **La clave del Panel (2580) no es seguridad real**: es solo para que los chicos no cambien
   los precios en su propio celular. Cualquiera con conocimientos puede leer el código.
 - **Aviso legal chico**: si la tienda crece y querés facturar, consultá cómo emitir
@@ -305,6 +400,7 @@ tienda-mr-lolo/
     ├── css/app.css         ← estilos, en capas (@layer)
     ├── js/
     │   ├── data.js         ← ⭐ ACÁ se editan productos, precios y la trivia
+    │   │                     (revision: cambia sola al publicar desde el panel)
     │   ├── app.js          ← la lógica (carrito, pedido, trivia, juegos, panel)
     │   ├── tetris.js       ← el Tetris (se descarga solo si lo abrís)
     │   └── qr.js           ← generador de códigos QR propio
