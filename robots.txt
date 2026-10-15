@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Mr. LOLO — Golosinas del recreo
+# Reemplazá TU-DOMINIO por la dirección real si querés publicar un sitemap.

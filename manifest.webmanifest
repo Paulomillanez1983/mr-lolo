@@ -1,0 +1,29 @@
+{
+  "name": "Mr. LOLO — Golosinas del recreo",
+  "short_name": "Mr. LOLO",
+  "description": "Elegí tus golosinas, pedí por WhatsApp y retirá en el cole. Pago por Mercado Pago.",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "id": "mr-lolo-tienda",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#05070F",
+  "theme_color": "#05070F",
+  "categories": ["food", "shopping", "kids"],
+  "icons": [
+    { "src": "assets/img/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/img/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/img/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/img/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Ver el catálogo",
+      "short_name": "Catálogo",
+      "url": "./#catalogo"
+    }
+  ]
+}
