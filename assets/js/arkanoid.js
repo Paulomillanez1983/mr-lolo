@@ -22,6 +22,8 @@ if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D
   };
 }
 
+import { FX } from './fx.js';
+
 const COLORES = ['#FFE600', '#00B1EA', '#FF5C7A', '#00FF88', '#C24BFF', '#FF9500'];
 const TIPOS_ESPECIALES = {
   A: { nombre: 'Paleta ancha', color: '#00FF88', icono: '↔' },
@@ -168,6 +170,7 @@ export function iniciarArkanoid(opciones = {}) {
       vy: 0,
       r: 7,
       pegada: true,
+      estela: [],
     }];
   }
 
@@ -194,14 +197,32 @@ export function iniciarArkanoid(opciones = {}) {
     paleta.objetivo = Math.max(0, Math.min(ancho - paleta.w, x - paleta.w / 2));
   };
 
+  // En el celular se arrastra desde cualquier punto: la paleta acompaña el
+  // desplazamiento del pulgar y nunca queda tapada por la mano.
+  let agarre = null;
+
   const alMover = (e) => {
-    if (e.pointerType === 'mouse' && e.buttons === 0 && estado !== 'jugando') return;
-    moverA(e.clientX);
+    if (agarre && e.pointerId === agarre.id) {
+      const x = agarre.base + (e.clientX - agarre.x);
+      paleta.objetivo = Math.max(0, Math.min(ancho - paleta.w, x));
+      return;
+    }
+    if (e.pointerType === 'mouse') {
+      if (e.buttons === 0 && estado !== 'jugando') return;
+      moverA(e.clientX);
+    }
   };
+
   const alTocar = (e) => {
-    moverA(e.clientX);
+    if (e.pointerType === 'mouse') moverA(e.clientX);
+    else agarre = { id: e.pointerId, x: e.clientX, base: paleta.objetivo };
+
     if (estado === 'listo') lanzar();
     else if (estado === 'pausa') reanudar();
+  };
+
+  const alSoltar = (e) => {
+    if (agarre && e.pointerId === agarre.id) agarre = null;
   };
   const alTeclear = (e) => {
     if (e.key === 'Escape') { cerrar(); return; }
@@ -213,6 +234,8 @@ export function iniciarArkanoid(opciones = {}) {
 
   stage.addEventListener('pointermove', alMover);
   stage.addEventListener('pointerdown', alTocar);
+  stage.addEventListener('pointerup', alSoltar);
+  stage.addEventListener('pointercancel', alSoltar);
   document.addEventListener('keydown', alTeclear);
   window.addEventListener('resize', medir);
 
@@ -259,6 +282,9 @@ export function iniciarArkanoid(opciones = {}) {
     ocultarCapa();
     sonar(880, 0.08);
     setTimeout(() => sonar(1180, 0.12), 110);
+    FX.sfx('nivel');
+    FX.confeti(80, [COLORES[(nivel - 1) % COLORES.length], '#FFFFFF', '#FFE600']);
+    FX.destello('0,177,234', 0.3);
   }
 
   function perderVida() {
@@ -266,6 +292,8 @@ export function iniciarArkanoid(opciones = {}) {
     actualizarHud();
     sonar(180, 0.26, 'sawtooth');
     vibrar([40, 50, 40]);
+    FX.destello('255,70,70', 0.3);
+    FX.sfx('error');
     if (vidas <= 0) {
       terminar();
       return;
@@ -413,6 +441,11 @@ export function iniciarArkanoid(opciones = {}) {
           if (golpearLadrillo(b, l)) break;
         }
       }
+
+      // Estela luminosa: guarda las últimas posiciones de cada pelota.
+      if (!b.estela) b.estela = [];
+      b.estela.push({ x: b.x, y: b.y });
+      if (b.estela.length > 14) b.estela.shift();
     });
 
     bolas = bolas.filter((b) => b.y - b.r < alto + 30);
@@ -526,8 +559,18 @@ export function iniciarArkanoid(opciones = {}) {
     ctx.roundRect(paleta.x + 4, alto - 32, paleta.w - 8, 3, 2);
     ctx.fill();
 
-    // Pelotas
+    // Pelotas (con estela)
     bolas.forEach((b) => {
+      (b.estela || []).forEach((p, i) => {
+        const t = i / Math.max(1, b.estela.length);
+        ctx.globalAlpha = t * 0.3;
+        ctx.fillStyle = '#00B1EA';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, b.r * (0.3 + t * 0.7), 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+
       ctx.save();
       ctx.shadowColor = '#00B1EA';
       ctx.shadowBlur = 16;
@@ -580,6 +623,8 @@ export function iniciarArkanoid(opciones = {}) {
     cancelAnimationFrame(raf);
     stage.removeEventListener('pointermove', alMover);
     stage.removeEventListener('pointerdown', alTocar);
+    stage.removeEventListener('pointerup', alSoltar);
+    stage.removeEventListener('pointercancel', alSoltar);
     document.removeEventListener('keydown', alTeclear);
     window.removeEventListener('resize', medir);
     raiz.remove();

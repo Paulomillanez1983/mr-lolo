@@ -5,6 +5,8 @@
    Puntaje = 1000 − intentos − segundos, con bonus por racha.
    ========================================================================== */
 
+import { FX } from './fx.js';
+
 const DULCES = ['🍬', '🍭', '🍫', '🍪', '🧁', '🍩', '🍿', '🍦', '🥨', '🍮'];
 const PARES = 8;   // 16 cartas = 4×4
 
@@ -151,6 +153,7 @@ export function iniciarMemoria(opciones = {}) {
         sonar(980, 0.07);
         setTimeout(() => sonar(1320, 0.1), 90);
         vibrar(14);
+        if (racha >= 3) FX.confeti(26, ['#C24BFF', '#FFE600', '#FFFFFF']);
         if (pares === PARES) ganar();
       }, 340);
     } else {
@@ -178,6 +181,9 @@ export function iniciarMemoria(opciones = {}) {
     setTimeout(() => sonar(1180, 0.1), 120);
     setTimeout(() => sonar(1480, 0.18), 240);
     vibrar([30, 50, 30]);
+    FX.sfx('record');
+    FX.confeti(120, ['#C24BFF', '#FFE600', '#00FF88', '#FFFFFF']);
+    FX.destello('194,75,255', 0.3);
     alTerminar(puntos, { intentos, segundos, pares, mejorRacha });
   }
 

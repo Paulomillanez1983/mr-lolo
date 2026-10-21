@@ -8,6 +8,8 @@
    recién cuando alguien los abre (no pesan en la primera visita).
    ========================================================================== */
 
+import { FX } from './fx.js';
+
 const CLAVE_PERFIL = 'mrlolo.perfil';
 const CLAVE_RETO = 'mrlolo.reto';
 
@@ -189,6 +191,8 @@ export function abrirSala() {
   document.body.classList.add('sin-scroll');
   render();
   raiz.classList.add('sala--on');
+  FX.despertar();
+  FX.musica('sala');
   document.addEventListener('keydown', alTeclear);
 }
 
@@ -200,6 +204,7 @@ export function cerrarSala() {
   raiz.hidden = true;
   document.body.classList.remove('sin-scroll');
   document.removeEventListener('keydown', alTeclear);
+  FX.pararMusica();
 }
 
 function alTeclear(e) {
@@ -231,6 +236,7 @@ function construir() {
         </div>
         <span class="sala__fichas" data-sala-txt="fichas">🪙 0</span>
       </div>
+      <button class="sala__x sala__x--sonido" type="button" data-sala="sonido" aria-label="Activar o silenciar el sonido">${FX.silenciado ? '🔇' : '🔊'}</button>
       <button class="sala__x" type="button" data-sala="cerrar" aria-label="Cerrar la sala">✕</button>
     </header>
     <nav class="sala__tabs" aria-label="Secciones de la sala">
@@ -474,6 +480,13 @@ async function jugar(id) {
   if (resultado) quitarResultado();
 
   raiz.classList.add('sala--jugando');
+  await FX.cine({
+    icono: spec.icono,
+    titulo: spec.nombre.toUpperCase(),
+    color: spec.color,
+    sub: spec.tag,
+  });
+  FX.musica(spec.id);
   const recordPrevio = perfil.records[id]?.puntos || 0;
 
   let controles = null;
@@ -487,6 +500,7 @@ async function jugar(id) {
       if (activo === controles) {
         activo = null;
         raiz.classList.remove('sala--jugando');
+        FX.musica('sala');
       }
     },
   };
@@ -514,6 +528,7 @@ function cerrarJuegoActual() {
   activo = null;
   try { j?.cerrar?.(); } catch { /* ignorado */ }
   raiz?.classList.remove('sala--jugando');
+  FX.musica('sala');
 }
 
 function alTerminarPartida(spec, puntos, extra = {}) {
@@ -596,8 +611,12 @@ function alTerminarPartida(spec, puntos, extra = {}) {
     setTimeout(() => deps.sonar?.(1180, 0.09), 110);
     setTimeout(() => deps.sonar?.(1480, 0.16), 220);
     deps.vibrar?.([25, 40, 25, 40, 60]);
+    FX.sfx('record');
+    FX.confeti(110, [spec.color, '#FFE600', '#FFFFFF', '#00FF88']);
+    FX.destello('255,230,0', 0.42);
   }
 
+  FX.musica('sala');
   render();
   mostrarResultado();
 }
@@ -739,7 +758,11 @@ export function engancharSala() {
 
     const accion = e.target.closest('[data-sala]')?.dataset.sala;
     if (accion === 'cerrar') cerrarSala();
-    else if (accion === 'perfil') abrirPerfil();
+    else if (accion === 'sonido') {
+      const apagado = FX.alternarSonido();
+      const boton = raiz.querySelector('[data-sala="sonido"]');
+      if (boton) boton.textContent = apagado ? '🔇' : '🔊';
+    } else if (accion === 'perfil') abrirPerfil();
     else if (accion === 'refrescar') {
       rankingCache.clear();
       render();

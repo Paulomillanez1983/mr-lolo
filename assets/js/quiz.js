@@ -9,6 +9,8 @@
    · Puntaje: 100 por acierto + bonus por velocidad + bonus por racha.
    ========================================================================== */
 
+import { FX } from './fx.js';
+
 const BANCO = [
   { emoji: '🦒', fondo: '#FFB300', pregunta: '¿Qué animal tiene el cuello más largo?', opciones: ['Jirafa', 'Cebra', 'Avestruz'], dato: 'La jirafa puede medir hasta 5,5 metros.' },
   { emoji: '🐘', fondo: '#7A8B99', pregunta: '¿Cuál es el animal terrestre más grande?', opciones: ['Elefante', 'Rinoceronte', 'Hipopótamo'], dato: 'El elefante africano pesa como 6 autos.' },
@@ -282,10 +284,15 @@ export function iniciarQuiz(opciones = {}) {
       sonar(880, 0.07);
       setTimeout(() => sonar(1180, 0.09), 90);
       vibrar(15);
+      FX.sfx('acierto');
+      FX.destello('0,255,136', 0.16);
+      if (racha >= 2) FX.confeti(28, ['#00FF88', '#FFE600', '#FFFFFF']);
     } else {
       racha = 0;
       sonar(180, 0.18, 'sawtooth');
       vibrar([40, 50]);
+      FX.sfx('error');
+      FX.destello('255,70,70', 0.28);
     }
 
     actualizarHud();

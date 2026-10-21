@@ -5,6 +5,9 @@
    Cada golosina suma 10 puntos y la serpiente va más rápido.
    ========================================================================== */
 
+import { FX } from './fx.js';
+import { crearJoystick } from './joystick.js';
+
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r = 0) {
     const radio = Math.min(Number(r) || 0, Math.abs(w) / 2, Math.abs(h) / 2);
@@ -44,13 +47,8 @@ export function iniciarSnake(opciones = {}) {
     </div>
     <div class="snk__stage" data-snk="stage">
       <canvas data-snk="lienzo"></canvas>
+      <span class="snk__hint" data-snk="hint">Apoyá el pulgar y arrastrá</span>
       <div class="snk__capa" data-snk="capa"></div>
-    </div>
-    <div class="snk__pad">
-      <button type="button" data-snk="arriba" aria-label="Arriba">▲</button>
-      <button type="button" data-snk="izq" aria-label="Izquierda">◀</button>
-      <button type="button" data-snk="abajo" aria-label="Abajo">▼</button>
-      <button type="button" data-snk="der" aria-label="Derecha">▶</button>
     </div>
   `;
   document.body.append(raiz);
@@ -187,6 +185,11 @@ export function iniciarSnake(opciones = {}) {
       sembrarComida();
       sonar(880 + Math.random() * 180, 0.06);
       vibrar(10);
+      if (puntos % 50 === 0) {
+        FX.sfx('acierto');
+        FX.confeti(34, [SABORES[comida.tipo], '#FFFFFF', '#00FF88']);
+        FX.destello('0,255,136', 0.16);
+      }
       actualizarHud();
     } else {
       cuerpo.pop();
@@ -198,6 +201,8 @@ export function iniciarSnake(opciones = {}) {
     cancelAnimationFrame(raf);
     sonar(140, 0.3, 'sawtooth');
     vibrar([50, 60, 50]);
+    FX.destello('255,70,70', 0.34);
+    FX.sfx('error');
     if (puntos > mejor) mejor = puntos;
     dibujar();
     alTerminar(puntos, { largo: cuerpo.length, record: mejor });
@@ -365,19 +370,13 @@ export function iniciarSnake(opciones = {}) {
     }
   };
 
-  const alBajar = (e) => { swipe = { x: e.clientX, y: e.clientY }; };
-  const alSoltar = (e) => {
-    if (!swipe) return;
-    const dx = e.clientX - swipe.x;
-    const dy = e.clientY - swipe.y;
-    swipe = null;
-    if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
-    if (Math.abs(dx) > Math.abs(dy)) girar(dx > 0 ? 1 : -1, 0);
-    else girar(0, dy > 0 ? 1 : -1);
-  };
-
-  stage.addEventListener('pointerdown', alBajar);
-  stage.addEventListener('pointerup', alSoltar);
+  const pista = buscar('hint');
+  const stick = crearJoystick(stage, {
+    onDireccion: (d) => {
+      girar(d.x, d.y);
+      pista?.classList.add('snk__hint--off');
+    },
+  });
   document.addEventListener('keydown', alTeclear);
   window.addEventListener('resize', medir);
 
@@ -387,17 +386,12 @@ export function iniciarSnake(opciones = {}) {
     const a = b.dataset.snk;
     if (a === 'salir') cerrar();
     else if (a === 'seguir') pausar();
-    else if (a === 'arriba') girar(0, -1);
-    else if (a === 'abajo') girar(0, 1);
-    else if (a === 'izq') girar(-1, 0);
-    else if (a === 'der') girar(1, 0);
   });
 
   function cerrar() {
     cerrado = true;
     cancelAnimationFrame(raf);
-    stage.removeEventListener('pointerdown', alBajar);
-    stage.removeEventListener('pointerup', alSoltar);
+    stick.destruir();
     document.removeEventListener('keydown', alTeclear);
     window.removeEventListener('resize', medir);
     raiz.remove();

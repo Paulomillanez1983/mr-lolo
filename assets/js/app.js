@@ -17,6 +17,7 @@
 import { TIENDA, CATEGORIAS, PRODUCTOS, TRIVIA } from './data.js';
 import { nube } from './nube.js';
 import { configurarSala, abrirSala, cerrarSala } from './sala.js';
+import { FX } from './fx.js';
 // El generador de QR se carga con import() dinámico, solo cuando alguien abre
 // el cartel: así no pesa en la primera visita.
 
@@ -1653,6 +1654,7 @@ function bucleJuego(ahora) {
           juego.puntos += suma;
           juego.chispas.push({ x: it.x, y: it.y - 20, texto: '+' + suma, alfa: 1 });
           sonar(it.tipo === 'estrella' ? 1320 : 880, 0.06);
+          if (it.tipo === 'estrella') FX.confeti(22, ['#FFE600', '#FFFFFF', '#FF9500']);
         }
         actualizarHud();
       }

@@ -43,6 +43,8 @@ const puntaje = (n, nivel) => PUNTOS_LINEA[n] * nivel;
 /* --------------------------------------------------------------------------
    Arranca una partida. Devuelve un objeto para cerrarla desde afuera.
    -------------------------------------------------------------------------- */
+import { FX } from './fx.js';
+
 export function iniciarTetris(opciones = {}) {
   const {
     sonar = () => {},
@@ -85,14 +87,7 @@ export function iniciarTetris(opciones = {}) {
       </div>
       <div class="tet__over" data-tet="capa" hidden></div>
     </div>
-    <div class="tet__pad">
-      <button type="button" data-tet="izq" aria-label="Mover a la izquierda">◀</button>
-      <button type="button" data-tet="rotar" aria-label="Girar">⟳</button>
-      <button type="button" data-tet="der" aria-label="Mover a la derecha">▶</button>
-      <button type="button" data-tet="soltar" aria-label="Soltar">⤓</button>
-      <button type="button" data-tet="bajar" aria-label="Bajar">▼</button>
-      <button type="button" data-tet="pausa" aria-label="Pausa">⏸</button>
-    </div>
+    <p class="tet__gestos" data-tet="gestos">Deslizá para mover · tocá para girar · deslizá abajo para bajar</p>
   `;
   document.body.append(raiz);
 
@@ -335,6 +330,11 @@ export function iniciarTetris(opciones = {}) {
       nivel = 1 + Math.floor(lineas / 8);
       sonar(borradas >= 4 ? 1320 : 880, borradas >= 4 ? 0.22 : 0.12);
       vibrar(borradas >= 4 ? 70 : 25);
+      if (borradas >= 2) {
+        FX.confeti(borradas >= 4 ? 70 : 28, ['#FF5C7A', '#FFE600', '#00B1EA', '#FFFFFF']);
+        FX.destello(borradas >= 4 ? '255,230,0' : '255,92,122', borradas >= 4 ? 0.34 : 0.18);
+        if (borradas >= 4) FX.sfx('nivel');
+      }
     } else {
       sonar(180, 0.05, 'triangle');
     }
@@ -503,6 +503,10 @@ export function iniciarTetris(opciones = {}) {
     terminado = true;
     cancelAnimationFrame(raf);
     document.removeEventListener('keydown', alTeclear);
+    lienzo.removeEventListener('pointerdown', alTocarTablero);
+    lienzo.removeEventListener('pointermove', alArrastrarTablero);
+    lienzo.removeEventListener('pointerup', alSoltarTablero);
+    lienzo.removeEventListener('pointercancel', alSoltarTablero);
     window.removeEventListener('resize', medir);
     raiz.remove();
     alSalir();
@@ -522,6 +526,49 @@ export function iniciarTetris(opciones = {}) {
     else if (e.key === ' ') soltar();
     else pausar();
   }
+
+  /* --- Gestos táctiles (sin flechitas) ---------------------------------- */
+  let toque = null;
+  const pistaGesto = buscar('gestos');
+
+  const alTocarTablero = (e) => {
+    if (e.button > 0) return;
+    toque = { id: e.pointerId, x: e.clientX, y: e.clientY, inicioY: e.clientY, movido: false, cuando: Date.now() };
+    try { lienzo.setPointerCapture(e.pointerId); } catch { /* ignorado */ }
+    pistaGesto?.classList.add('tet__gestos--off');
+  };
+
+  const alArrastrarTablero = (e) => {
+    if (!toque || e.pointerId !== toque.id) return;
+    e.preventDefault();
+    const dx = e.clientX - toque.x;
+    const dy = e.clientY - toque.y;
+    if (Math.abs(dx) > 20) {
+      mover(dx > 0 ? 1 : -1);
+      toque.x = e.clientX;
+      toque.y = e.clientY;
+      toque.movido = true;
+    } else if (dy > 24) {
+      if (paso(true)) actualizarHud();
+      dibujar();
+      toque.y = e.clientY;
+      toque.movido = true;
+    }
+  };
+
+  const alSoltarTablero = (e) => {
+    if (!toque || e.pointerId !== toque.id) return;
+    const dt = Date.now() - toque.cuando;
+    const subida = toque.inicioY - e.clientY;
+    if (!toque.movido && dt < 320) girarActual();
+    else if (subida > 60) soltar();
+    toque = null;
+  };
+
+  lienzo.addEventListener('pointerdown', alTocarTablero);
+  lienzo.addEventListener('pointermove', alArrastrarTablero);
+  lienzo.addEventListener('pointerup', alSoltarTablero);
+  lienzo.addEventListener('pointercancel', alSoltarTablero);
 
   raiz.addEventListener('click', (e) => {
     const b = e.target.closest('[data-tet]');

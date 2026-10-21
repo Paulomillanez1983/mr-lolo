@@ -19,7 +19,7 @@
    que ya visitaron la tienda descarten la caché anterior.
    ========================================================================== */
 
-const VERSION = 'mrlolo-v6';
+const VERSION = 'mrlolo-v7';
 const CACHE = `${VERSION}-estaticos`;
 
 const BASE = new URL('./', self.location);
@@ -42,6 +42,8 @@ const ESENCIALES = [
   url('assets/js/snake.js'),
   url('assets/js/memoria.js'),
   url('assets/js/quiz.js'),
+  url('assets/js/fx.js'),
+  url('assets/js/joystick.js'),
   url('assets/img/logo.svg'),
   url('assets/img/icono-192.png'),
   url('assets/img/alfajor-havanna.webp'),
