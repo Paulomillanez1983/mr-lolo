@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    MR. LOLO — Motor de efectos "next-gen"
    --------------------------------------------------------------------------
    Sin librerías ni archivos de audio: todo se sintetiza en el navegador.
@@ -255,14 +255,14 @@ class MotorFX {
   confeti(cantidad = 90, colores = ['#FFE600', '#00B1EA', '#FF5C7A', '#00FF88', '#C24BFF', '#FF9500']) {
     const lienzo = document.createElement('canvas');
     lienzo.className = 'fx-confeti';
-    lienzo.width = window.innerWidth * Math.min(2, devicePixelRatio || 1);
-    lienzo.height = window.innerHeight * Math.min(2, devicePixelRatio || 1);
+    lienzo.width = window.innerWidth * Math.min(2, window.devicePixelRatio || 1);
+    lienzo.height = window.innerHeight * Math.min(2, window.devicePixelRatio || 1);
     lienzo.style.width = '100%';
     lienzo.style.height = '100%';
     document.body.append(lienzo);
     const ctx = lienzo.getContext('2d');
     if (!ctx) { lienzo.remove(); return; }
-    const dpr = Math.min(2, devicePixelRatio || 1);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const ancho = window.innerWidth;
     const alto = window.innerHeight;

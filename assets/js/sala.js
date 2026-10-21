@@ -584,6 +584,7 @@ function alTerminarPartida(spec, puntos, extra = {}) {
     juego: spec,
     puntos: limpio,
     anterior,
+    detalle: extra,
     nuevoRecord,
     mejor: perfil.records[spec.id]?.puntos || limpio,
     xp,
@@ -638,6 +639,7 @@ function mostrarResultado() {
       <h3>${esc(r.juego.nombre)}</h3>
       <p class="res__puntos">${num(r.puntos)}</p>
       <p class="res__mejor">${r.nuevoRecord ? `¡Superaste tu marca de ${num(r.anterior)}!` : `Tu récord sigue en ${num(r.mejor)}`}</p>
+      ${r.detalle?.aciertos != null ? `<p class="res__detalle">${r.detalle.aciertos}/${r.detalle.total} aciertos · mejor racha x${r.detalle.mejorRacha || 1}</p>` : ''}
       <div class="res__stats">
         <span><b>+${num(r.xp)}</b><small>XP</small></span>
         <span><b>+${num(r.fichas)}</b><small>FICHAS</small></span>
