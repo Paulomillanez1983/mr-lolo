@@ -774,7 +774,7 @@ body.sin-scroll { overflow: hidden; }
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-6px) scale(1.03); }
 }
-.quiz__foto { width: 100%; height: 100%; object-fit: cover; }
+.quiz__foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .quiz__imagen--foto::after { background: linear-gradient(0deg, rgb(5 7 15 / .55), transparent 55%); }
 .quiz__marca {
   position: absolute;
@@ -1686,16 +1686,16 @@ dialog#dlg-panel .sheet { overscroll-behavior: contain; }
   z-index: 2;
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(130px, 1fr) auto;
   gap: clamp(.4rem, 1.4vh, .7rem);
 }
 .quiz__juego[hidden] { display: none !important; }
 
 .quiz__escenario {
   position: relative;
-  flex: 0 1 auto;
   min-height: 0;
+  display: flex;
 }
 .quiz__escenario::before,
 .quiz__escenario::after { display: none; }
@@ -1705,8 +1705,8 @@ dialog#dlg-panel .sheet { overscroll-behavior: contain; }
   display: grid;
   place-items: center;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  max-height: 30vh;
+  height: 100%;
+  min-height: 0;
   border-radius: 18px;
   overflow: hidden;
   border: 1px solid rgb(255 255 255 / .16);
@@ -1743,12 +1743,12 @@ dialog#dlg-panel .sheet { overscroll-behavior: contain; }
   opacity: .55;
 }
 @keyframes girarHalo { to { transform: rotate(360deg); } }
-.quiz__foto { width: 100%; height: 100%; object-fit: cover; }
+.quiz__foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .quiz__imagen--foto::after { background: linear-gradient(0deg, rgb(5 7 15 / .6), transparent 55%); }
 .quiz__marca {
   position: absolute;
   left: .6rem;
-  bottom: .6rem;
+  top: .6rem;
   z-index: 3;
   font: 800 .5rem/1 ui-monospace, monospace;
   letter-spacing: .14em;
