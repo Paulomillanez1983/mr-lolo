@@ -10,10 +10,10 @@ export const TIENDA = {
   nombre: 'Mr. LOLO',
   bajada: 'Golosinas del recreo, a un toque 🍬',
   firma: 'GOLOSINAS DEL RECREO',
-  version: '4.1',
+  version: '4.2',
   // Revisión interna: cambia cuando se publica desde el panel. Sirve para
   // detectar si en un celular quedaron cambios guardados de una versión vieja.
-  revision: 'r4.1',
+  revision: 'r4.2',
 
   /* --- Contacto y pago -------------------------------------------------- */
   // WhatsApp con código de país, solo números (Argentina: 549 + área + número).
