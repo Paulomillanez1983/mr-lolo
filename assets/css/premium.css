@@ -2550,3 +2550,28 @@ dialog#dlg-panel .sheet { overscroll-behavior: contain; }
   .quiz__opcion { min-height: 62px; }
   .quiz__texto { font-size: .95rem; }
 }
+
+/* --------------------------------------------------------------------------
+   23. PC de dos columnas y tienda sin desborde en celular
+   -------------------------------------------------------------------------- */
+html, body { overflow-x: clip; }
+
+@media (max-width: 560px) {
+  .topbar__in { flex-wrap: wrap; row-gap: .4rem; }
+  .topbar__actions { flex-wrap: wrap; max-width: 100%; justify-content: flex-end; }
+  .topbar__actions .chip,
+  .topbar__actions .vivo { flex: 0 1 auto; }
+  .topbar__actions .iconbtn { flex: 0 0 auto; }
+}
+
+@media (min-width: 900px) {
+  .quiz__juego {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .quiz__barra-ronda { grid-column: 1 / -1; }
+  .quiz__escenario { grid-column: 1; grid-row: 2; min-height: 0; }
+  .quiz__panel { grid-column: 2; grid-row: 2; justify-content: center; }
+  .quiz__imagen { max-height: none; height: 100%; }
+  .quiz__foto--escena { object-fit: contain !important; }
+}
