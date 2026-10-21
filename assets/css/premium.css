@@ -2405,3 +2405,34 @@ dialog#dlg-panel .sheet { overscroll-behavior: contain; }
 .quiz__producto .quiz__foto { position: static; inset: auto; margin: auto; }
 .quiz__producto--zoom .quiz__foto { position: absolute; inset: 0; padding: 0; }
 .quiz__grupo-item .quiz__foto { position: static; inset: auto; }
+
+/* La foto del producto se ajusta al marco, nunca se desborda */
+.quiz__producto .quiz__foto {
+  position: static !important;
+  inset: auto !important;
+  width: auto !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  padding: 4px;
+}
+.quiz__grupo-item .quiz__foto {
+  position: static !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+}
+.quiz__producto--zoom .quiz__foto {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: cover !important;
+  padding: 0 !important;
+}
