@@ -22,6 +22,34 @@ import { FX } from './fx.js';
 // el cartel: así no pesa en la primera visita.
 
 /* --------------------------------------------------------------------------
+   Actualización de versión
+   --------------------------------------------------------------------------
+   El service worker guarda la app para que funcione sin internet, pero eso
+   hacía que algunos celulares siguieran viendo la versión vieja. Cuando cambia
+   la versión: se borra la caché, se desregistra el worker y se recarga una vez.
+   -------------------------------------------------------------------------- */
+(function limpiarVersionVieja() {
+  try {
+    const clave = 'mrlolo.version';
+    if (localStorage.getItem(clave) === TIENDA.version) return;
+    localStorage.setItem(clave, TIENDA.version);
+    (async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const registros = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registros.map((r) => r.unregister()));
+        }
+        if (typeof caches !== 'undefined') {
+          const nombres = await caches.keys();
+          await Promise.all(nombres.map((n) => caches.delete(n)));
+        }
+      } catch { /* seguimos igual */ }
+      try { location.reload(); } catch { /* entorno sin recarga */ }
+    })();
+  } catch { /* modo privado sin almacenamiento */ }
+})();
+
+/* --------------------------------------------------------------------------
    Utilidades
    -------------------------------------------------------------------------- */
 const $ = (sel, raiz = document) => raiz.querySelector(sel);
