@@ -1,0 +1,151 @@
+﻿[
+    {
+        "value":  [
+                      {
+                          "archivo":  "messi.jpg",
+                          "titulo":  "Lionel Messi",
+                          "fuente":  "https://en.wikipedia.org/wiki/Lionel%20Messi",
+                          "imagen":  "Leo_Messi_Argentina_v_Egypt_7_July_2026-1.jpg"
+                      },
+                      {
+                          "archivo":  "mbappe.jpg",
+                          "titulo":  "Kylian Mbappé",
+                          "fuente":  "https://en.wikipedia.org/wiki/Kylian%20Mbapp%C3%A9",
+                          "imagen":  "Kylian_Mbappe_France_v_Senegal_16_June_2026-391_(cropped).jpg"
+                      },
+                      {
+                          "archivo":  "maradona.jpg",
+                          "titulo":  "Diego Maradona",
+                          "fuente":  "https://en.wikipedia.org/wiki/Diego%20Maradona",
+                          "imagen":  "Argentina_celebrando_copa_(cropped).jpg"
+                      },
+                      {
+                          "archivo":  "ronaldo.jpg",
+                          "titulo":  "Cristiano Ronaldo",
+                          "fuente":  "https://en.wikipedia.org/wiki/Cristiano%20Ronaldo",
+                          "imagen":  "Cristiano_Ronaldo_Croatia_v_Portugal_2_July_2026-075_(cropped).jpg"
+                      },
+                      {
+                          "archivo":  "trofeo.jpg",
+                          "titulo":  "FIFA World Cup Trophy",
+                          "fuente":  "https://en.wikipedia.org/wiki/FIFA%20World%20Cup%20Trophy",
+                          "imagen":  "FIFA_World_Cup_Trophy_photo_by_Djuradj_Vujcic.jpg"
+                      },
+                      {
+                          "archivo":  "cervantes.jpg",
+                          "titulo":  "Miguel de Cervantes",
+                          "fuente":  "https://en.wikipedia.org/wiki/Miguel%20de%20Cervantes",
+                          "imagen":  "Cervantes_Jáuregui.jpg"
+                      },
+                      {
+                          "archivo":  "shakespeare.jpg",
+                          "titulo":  "William Shakespeare",
+                          "fuente":  "https://en.wikipedia.org/wiki/William%20Shakespeare",
+                          "imagen":  "William_Shakespeare_by_John_Taylor,_edited.jpg"
+                      },
+                      {
+                          "archivo":  "garcia-marquez.jpg",
+                          "titulo":  "Gabriel García Márquez",
+                          "fuente":  "https://en.wikipedia.org/wiki/Gabriel%20Garc%C3%ADa%20M%C3%A1rquez",
+                          "imagen":  "Gabriel_Garcia_Marquez.jpg"
+                      },
+                      {
+                          "archivo":  "torre-eiffel.jpg",
+                          "titulo":  "Eiffel Tower",
+                          "fuente":  "https://en.wikipedia.org/wiki/Eiffel%20Tower",
+                          "imagen":  "Tour_Eiffel_Wikimedia_Commons_(cropped).jpg"
+                      }
+                  ],
+        "Count":  9
+    },
+    {
+        "archivo":  "quijote.jpg",
+        "titulo":  "Don Quixote",
+        "fuente":  "https://en.wikipedia.org/wiki/Don%20Quixote",
+        "imagen":  "Title_page_first_edition_Don_Quijote.jpg"
+    },
+    {
+        "archivo":  "machu-picchu.jpg",
+        "titulo":  "Machu Picchu",
+        "fuente":  "https://en.wikipedia.org/wiki/Machu%20Picchu",
+        "imagen":  "Machu_Picchu,_2023_(012).jpg"
+    },
+    {
+        "archivo":  "amazonas.jpg",
+        "titulo":  "Amazon River",
+        "fuente":  "https://en.wikipedia.org/wiki/Amazon%20River",
+        "imagen":  "Amazon_River_ESA387332.jpg"
+    },
+    {
+        "archivo":  "gran-muralla.jpg",
+        "titulo":  "Great Wall of China",
+        "fuente":  "https://en.wikipedia.org/wiki/Great%20Wall%20of%20China",
+        "imagen":  "The_Great_Wall_of_China_at_Jinshanling-edit.jpg"
+    },
+    {
+        "archivo":  "piramides.jpg",
+        "titulo":  "Great Pyramid of Giza",
+        "fuente":  "https://en.wikipedia.org/wiki/Great%20Pyramid%20of%20Giza",
+        "imagen":  "Great_Pyramid_of_Giza_-_Pyramid_of_Khufu.jpg"
+    },
+    {
+        "archivo":  "libertad.jpg",
+        "titulo":  "Statue of Liberty",
+        "fuente":  "https://en.wikipedia.org/wiki/Statue%20of%20Liberty",
+        "imagen":  "Front_view_of_Statue_of_Liberty_(cropped).jpg"
+    },
+    {
+        "archivo":  "einstein.jpg",
+        "titulo":  "Albert Einstein",
+        "fuente":  "https://en.wikipedia.org/wiki/Albert%20Einstein",
+        "imagen":  "Albert_Einstein_Head_cleaned.jpg"
+    },
+    {
+        "archivo":  "luna.jpg",
+        "titulo":  "Moon",
+        "fuente":  "https://en.wikipedia.org/wiki/Moon",
+        "imagen":  "FullMoon2010.jpg"
+    },
+    {
+        "archivo":  "jupiter.jpg",
+        "titulo":  "Jupiter",
+        "fuente":  "https://en.wikipedia.org/wiki/Jupiter",
+        "imagen":  "Jupiter_OPAL_2024.png"
+    },
+    {
+        "archivo":  "esqueleto.jpg",
+        "titulo":  "Human skeleton",
+        "fuente":  "https://en.wikipedia.org/wiki/Human%20skeleton",
+        "imagen":  "Human-Skeleton.jpg"
+    },
+    {
+        "archivo":  "mona-lisa.jpg",
+        "titulo":  "Mona Lisa",
+        "fuente":  "https://en.wikipedia.org/wiki/Mona%20Lisa",
+        "imagen":  "Mona_Lisa.jpg"
+    },
+    {
+        "archivo":  "van-gogh.jpg",
+        "titulo":  "Vincent van Gogh",
+        "fuente":  "https://en.wikipedia.org/wiki/Vincent%20van%20Gogh",
+        "imagen":  "Vincent_van_Gogh_-_Self-Portrait_-_Google_Art_Project_(454045).jpg"
+    },
+    {
+        "archivo":  "mozart.jpg",
+        "titulo":  "Wolfgang Amadeus Mozart",
+        "fuente":  "https://en.wikipedia.org/wiki/Wolfgang%20Amadeus%20Mozart",
+        "imagen":  "The_Mozart_Family_-_Wolfgang_Amadeus_Mozart_headshot.jpg"
+    },
+    {
+        "archivo":  "muro-berlin.jpg",
+        "titulo":  "Berlin Wall",
+        "fuente":  "https://en.wikipedia.org/wiki/Berlin%20Wall",
+        "imagen":  "Berlinermauer.jpg"
+    },
+    {
+        "archivo":  "titanic.jpg",
+        "titulo":  "Titanic",
+        "fuente":  "https://en.wikipedia.org/wiki/Titanic",
+        "imagen":  "RMS_Titanic_3_(cropped_to_ship).jpg"
+    }
+]

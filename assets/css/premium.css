@@ -2436,3 +2436,46 @@ dialog#dlg-panel .sheet { overscroll-behavior: contain; }
   object-fit: cover !important;
   padding: 0 !important;
 }
+
+/* --------------------------------------------------------------------------
+   21. EL DESAFÍO v5: escenas con imagen real
+   -------------------------------------------------------------------------- */
+.quiz__imagen--escena { background: #080B16; }
+.quiz__escena {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.quiz__escena-fondo {
+  position: absolute;
+  inset: -8%;
+  width: 116%;
+  height: 116%;
+  object-fit: cover;
+  filter: blur(20px) brightness(.42) saturate(1.15);
+  transform: scale(1.04);
+}
+.quiz__foto--escena {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  padding: 6px;
+  animation: kenBurns 10s ease-in-out infinite alternate;
+  filter: drop-shadow(0 20px 30px rgb(0 0 0 / .5));
+}
+@keyframes kenBurns {
+  from { transform: scale(1) translateY(0); }
+  to { transform: scale(1.06) translateY(-1.5%); }
+}
+.quiz__credito {
+  font-size: .52rem;
+  color: rgb(255 255 255 / .32);
+  letter-spacing: .04em;
+}
