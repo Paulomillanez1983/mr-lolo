@@ -2273,6 +2273,12 @@ export const TIENDA = {
      rama: ${txt(pub.rama || 'main')},
      url: ${txt(pub.url || '')},
    },
+   portada: ${txt(t.portada || '')},
+   nube: {
+     url: ${txt(t.nube?.url || '')},
+     clave: ${txt(t.nube?.clave || '')},
+     bucket: ${txt(t.nube?.bucket || 'fotos')},
+   },
    urlPublica: ${txt(t.urlPublica || '')},
  };
  `;
@@ -2604,7 +2610,26 @@ function pintarNube() {
   }
 }
 
+/* La primera vez que se abre la tienda con la nube configurada en data.js,
+   subimos la vitrina para que los demás ya la encuentren. */
+async function sembrarNubeSiFalta() {
+  try {
+    const remoto = await nube.leer();
+    if (!remoto) await sincronizarNube({ silencioso: true });
+  } catch { /* sin red: se reintenta en la próxima visita */ }
+}
+
 function iniciarNube(forzar = false) {
+  // Si data.js trae la nube y nadie la desconectó a mano, se usa sola.
+  const apagada = almacen.get('mrlolo.nube.off', '') === '1';
+  if (!nube.activa() && !apagada && TIENDA.nube?.url && TIENDA.nube?.clave) {
+    nube.configurar({
+      url: TIENDA.nube.url,
+      clave: TIENDA.nube.clave,
+      bucket: TIENDA.nube.bucket || 'fotos',
+    });
+  }
+
   if (!nubeIniciada) {
     nubeIniciada = true;
     nube.addEventListener('estado', pintarNube);
@@ -2615,6 +2640,7 @@ function iniciarNube(forzar = false) {
   if (forzar || !nube.temporizador) {
     nube.suscribir((datos, revision) => aplicarRemoto(datos, revision));
     nube.reintentarPendiente().catch(() => { /* sin red */ });
+    sembrarNubeSiFalta();
   }
 }
 
@@ -2659,6 +2685,7 @@ async function conectarNube() {
   }
 
   nube.configurar(cfg);
+  almacen.borrar('mrlolo.nube.off');
 
   if (prueba.hayFila) {
     // Ya hay una tienda en la nube: esa manda, para no pisar lo de otro celular.
@@ -2810,6 +2837,7 @@ document.addEventListener('click', (e) => {
   if ('nubeSync' in d) { sincronizarNube(); return; }
   if ('nubeDesconectar' in d) {
     nube.desconectar();
+    almacen.set('mrlolo.nube.off', '1');
     iniciarNube();
     pintarPanelAdmin();
     toast('Nube desconectada. La tienda sigue andando en modo local 💾', 5000);

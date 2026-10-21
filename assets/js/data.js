@@ -67,6 +67,15 @@ export const TIENDA = {
   // Foto grande de la tienda (la carga el panel, sección Fotos).
   portada: '',
 
+  /* --- Nube en vivo ----------------------------------------------------- */
+  // Proyecto de Supabase. La "anon key" es pública por diseño: está protegida
+  // por las políticas (RLS) de la base. No pongas acá la service_role key.
+  nube: {
+    url: 'https://pvvsaevtgaehbqkituvb.supabase.co',
+    clave: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2dnNhZXZ0Z2FlaGJxa2l0dXZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2MTUyNTAsImV4cCI6MjEwODE5MTI1MH0.i-6UkOVsxCRxw6GgiQ3dwIJbllHzWk2dcq2xcP_TeAo',
+    bucket: 'fotos',
+  },
+
   /* --- Dominio final (se usa para el QR) -------------------------------- */
   // Dejalo vacío y el QR usa la dirección real desde donde se abrió la tienda.
   urlPublica: '',
