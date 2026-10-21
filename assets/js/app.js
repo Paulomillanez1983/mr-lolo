@@ -15,6 +15,8 @@
    ========================================================================== */
 
 import { TIENDA, CATEGORIAS, PRODUCTOS, TRIVIA } from './data.js';
+import { nube } from './nube.js';
+import { configurarSala, abrirSala, cerrarSala } from './sala.js';
 // El generador de QR se carga con import() dinámico, solo cuando alguien abre
 // el cartel: así no pesa en la primera visita.
 
@@ -254,6 +256,18 @@ function pintarTextos() {
   $$('[data-t="bajada"]').forEach((el) => (el.innerHTML = esc(t.bajada).replace(/\*(.+?)\*/g, '<em>$1</em>')));
   $$('[data-t="aliasLabel"]').forEach((el) => (el.textContent = 'PAGÁ A ESTE ALIAS'));
   document.title = `${t.nombre} 🍬 Golosinas del recreo, a un toque`;
+
+  // Portada: si hay una foto cargada, el héroe se viste con ella.
+  const hero = $('.hero');
+  if (hero) {
+    if (t.portada) {
+      hero.style.setProperty('--portada', `url("${t.portada}")`);
+      hero.classList.add('hero--portada');
+    } else {
+      hero.style.removeProperty('--portada');
+      hero.classList.remove('hero--portada');
+    }
+  }
 
   $('#alias').textContent = t.alias || '—';
   const wa = $('#btn-wa');
@@ -1451,52 +1465,15 @@ function terminarRonda() {
 let juegoTetris = null;
 
 function abrirJuegos() {
-  const t = estado.tienda;
-  const tarjetas = [];
-
-  if (t.juego !== false) {
-    const meta = Number(t.premio?.caramelos) || 0;
-    tarjetas.push(`
-      <button class="jcard" type="button" data-juego="caramelos">
-        <span class="jcard__ico">🍬</span>
-        <b>Lluvia de caramelos</b>
-        <small>Atrapá los caramelos que caen y esquivá el brócoli. 45 segundos.</small>
-        ${meta ? `<em>Premio: ${meta} puntos${t.premio?.texto ? ' → ' + esc(t.premio.texto) : ''}</em>` : ''}
-      </button>`);
-  }
-
-  if (t.tetris !== false) {
-    tarjetas.push(`
-      <button class="jcard" type="button" data-juego="tetris">
-        <span class="jcard__ico">🧱</span>
-        <b>Tetris de golosinas</b>
-        <small>Armá líneas con los caramelos y no dejes que se apilen. Se maneja con las flechas o con los botones.</small>
-        <em>Récord: ${almacen.get(CLAVES.tetrisRecord, '0')} puntos</em>
-      </button>`);
-  }
-
-  if (!tarjetas.length) {
-    toast('Los juegos están apagados por ahora');
-    return;
-  }
-
-  $('#juegos-cuerpo').innerHTML = `
-    <div class="dlg-head">
-      <h2 id="juegos-titulo">🎮 Juegos</h2>
-      <button class="dlg-close" type="button" data-cerrar aria-label="Cerrar">✕</button>
-    </div>
-    <div class="juegos">${tarjetas.join('')}</div>
-    <div class="dlg-actions">
-      <button class="btn btn--ghost" type="button" data-cerrar>Volver a la tienda</button>
-    </div>
-  `;
-  abrirDialogo('dlg-juegos');
+  // La sala arcade reemplazó al menú viejo. Mantenemos el nombre de la función
+  // porque la usan los botones de la tienda y el doble toque en el logo.
+  abrirSala();
 }
 
-async function abrirTetris() {
+async function abrirTetris(comunes = {}) {
   if (estado.tienda.tetris === false) {
     toast('El Tetris está apagado por ahora');
-    return;
+    return null;
   }
   if (juegoTetris) {
     juegoTetris.cerrar();
@@ -1513,10 +1490,16 @@ async function abrirTetris() {
       atiende: estado.tienda.atiende,
       recordInicial: Number(almacen.get(CLAVES.tetrisRecord, '0')) || 0,
       alGuardarRecord: (r) => almacen.set(CLAVES.tetrisRecord, String(r)),
-      alSalir: () => { juegoTetris = null; },
+      alTerminar: comunes.alTerminar,
+      alSalir: () => {
+        juegoTetris = null;
+        comunes.alSalir?.();
+      },
     });
+    return juegoTetris;
   } catch {
     toast('No pudimos abrir el Tetris 😕');
+    return null;
   }
 }
 
@@ -1527,8 +1510,10 @@ let juego = null;
 
 const CARAMELOS = ['🍬', '🍭', '🍫', '🍪'];
 
-function iniciarJuego() {
-  if (juego) return;
+function iniciarJuego(opciones = {}) {
+  if (juego) return { cerrar: cerrarJuego, raiz: $('#capa-juego'), pausar: () => {} };
+
+  const { alTerminar = null, alSalir = null } = opciones;
 
   const capa = document.createElement('div');
   capa.id = 'capa-juego';
@@ -1572,6 +1557,8 @@ function iniciarJuego() {
     corriendo: false, ultimo: 0, raf: 0, espera: 0, estadoAnimo: 'idle', animoHasta: 0,
     record: Number(almacen.get(CLAVES.juegoRecord, '0')) || 0,
     sprites: {},
+    alTerminar,
+    alSalir,
   };
 
   ['idle', 'sad', 'contento'].forEach((m) => {
@@ -1596,6 +1583,7 @@ function iniciarJuego() {
   document.addEventListener('keydown', juego.teclas);
 
   dibujarJuego();
+  return { cerrar: cerrarJuego, raiz: capa, pausar: () => {} };
 }
 
 function correrJuego() {
@@ -1745,6 +1733,13 @@ function terminarJuego() {
   const premio = estado.tienda.premio || {};
   const gano = premio.caramelos > 0 && premio.texto && juego.puntos >= premio.caramelos;
 
+  // Cuando se juega desde la sala, ella se encarga del resultado y del ranking.
+  if (juego.alTerminar) {
+    sonar(660, 0.1);
+    juego.alTerminar(juego.puntos, { vidas: Math.max(0, juego.vidas), record: juego.record });
+    return;
+  }
+
   const m = $('#j-mensaje');
   m.style.display = 'flex';
   m.innerHTML = `
@@ -1761,10 +1756,12 @@ function terminarJuego() {
 
 function cerrarJuego() {
   if (!juego) return;
+  const salir = juego.alSalir;
   cancelAnimationFrame(juego.raf);
   document.removeEventListener('keydown', juego.teclas);
   $('#capa-juego')?.remove();
   juego = null;
+  if (typeof salir === 'function') salir();
 }
 /* --------------------------------------------------------------------------
    Panel de administración (local, para el dueño de la tienda)
@@ -1787,25 +1784,29 @@ const sinDatos = (v) => (esFotoSubida(v) ? '' : v);
 
 const LADO_FOTO = 640;   // la tarjeta es más chica, pero así se ve nítida en pantallas grandes
 
-function comprimirFoto(archivo) {
+/* Achica y recorta la foto en el navegador. No viaja a ningún servidor:
+   el celular hace todo el trabajo. */
+function comprimirImagen(archivo, { lado = 640, aspecto = 1, calidad = 0.82 } = {}) {
   return new Promise((resolver, rechazar) => {
     const url = URL.createObjectURL(archivo);
     const img = new Image();
     img.onload = () => {
       try {
+        const ancho = lado;
+        const alto = Math.max(1, Math.round(lado / aspecto));
         const lienzo = document.createElement('canvas');
-        lienzo.width = LADO_FOTO;
-        lienzo.height = LADO_FOTO;
+        lienzo.width = ancho;
+        lienzo.height = alto;
         const c = lienzo.getContext('2d');
         c.fillStyle = '#0B0F1C';
-        c.fillRect(0, 0, LADO_FOTO, LADO_FOTO);
-        // Recorte cuadrado centrado, para que todas las fichas se vean iguales.
-        const escala = Math.max(LADO_FOTO / img.width, LADO_FOTO / img.height);
+        c.fillRect(0, 0, ancho, alto);
+        // Recorte centrado: todas las fichas se ven iguales.
+        const escala = Math.max(ancho / img.width, alto / img.height);
         const w = img.width * escala;
         const h = img.height * escala;
-        c.drawImage(img, (LADO_FOTO - w) / 2, (LADO_FOTO - h) / 2, w, h);
-        let salida = lienzo.toDataURL('image/webp', 0.82);
-        if (!salida.startsWith('data:image/webp')) salida = lienzo.toDataURL('image/jpeg', 0.85);
+        c.drawImage(img, (ancho - w) / 2, (alto - h) / 2, w, h);
+        let salida = lienzo.toDataURL('image/webp', calidad);
+        if (!salida.startsWith('data:image/webp')) salida = lienzo.toDataURL('image/jpeg', calidad + 0.03);
         URL.revokeObjectURL(url);
         resolver(salida);
       } catch (err) {
@@ -1820,6 +1821,9 @@ function comprimirFoto(archivo) {
     img.src = url;
   });
 }
+
+const comprimirFoto = (archivo) => comprimirImagen(archivo, { lado: LADO_FOTO, aspecto: 1 });
+const comprimirPortada = (archivo) => comprimirImagen(archivo, { lado: 1200, aspecto: 16 / 9, calidad: 0.8 });
 
 const pinActual = () => almacen.get(CLAVE_PIN, PIN_POR_DEFECTO);
 
@@ -1855,8 +1859,10 @@ function pintarPanelAdmin() {
   const t = estado.tienda;
   const tabs = [
     ['productos', '📦 Productos'],
+    ['fotos', '📸 Fotos'],
     ['tienda', '🏪 Tienda'],
     ['promos', '🎁 Promos'],
+    ['nube', '☁️ Nube'],
     ['datos', '💾 Datos'],
   ];
 
@@ -1924,6 +1930,53 @@ function pintarPanelAdmin() {
           .join('')}
       </div>
       <button class="btn btn--ghost btn--block" type="button" data-agregar-producto>➕ Agregar golosina</button>
+    `;
+  } else if (panel.seccion === 'fotos') {
+    const vivo = nube.activa();
+    cuerpo = `
+      <div class="estudio">
+        <div class="estudio__cab">
+          <div>
+            <b>📸 Estudio de fotos</b>
+            <p>Tocá una foto y sacale una nueva. Se achica sola y se publica al instante.</p>
+          </div>
+          <span class="estudio__vivo ${vivo ? 'on' : ''}">${vivo ? '● EN VIVO' : '● LOCAL'}</span>
+        </div>
+
+        <button class="estudio__portada" type="button" data-foto-portada>
+          <img src="${esc(t.portada || 'assets/img/portada.jpg')}" alt="Portada de la tienda">
+          <span class="estudio__portada-txt">
+            <b>PORTADA</b>
+            <small>La foto grande que abre la tienda</small>
+          </span>
+          <span class="estudio__cam">📷 Cambiar</span>
+        </button>
+
+        <div class="estudio__grid">
+          ${estado.productos
+            .map(
+              (p, i) => `
+            <div class="estudio__item">
+              <button class="estudio__foto" type="button" data-foto="${i}" aria-label="Cambiar la foto de ${esc(p.nombre)}">
+                <img src="${esc(p.imagen)}" alt="${esc(p.nombre)}" loading="lazy">
+                <span class="estudio__cam">📷</span>
+              </button>
+              <b>${esc(p.nombre)}</b>
+              <small>${dinero(p.precio)}</small>
+              <input type="file" accept="image/*" data-archivo-foto="${i}" class="archivo-oculto">
+            </div>`
+            )
+            .join('')}
+        </div>
+
+        <input type="file" accept="image/*" data-archivo-portada class="archivo-oculto">
+
+        <p class="estudio__pie">
+          ${vivo
+            ? '☁️ Con la nube conectada, la foto aparece en los celulares de todos en segundos.'
+            : '💾 Sin nube, la foto queda guardada en este dispositivo. Activala en ☁️ Nube para que la vean todos.'}
+        </p>
+      </div>
     `;
   } else if (panel.seccion === 'tienda') {
     cuerpo = `
@@ -2002,6 +2055,65 @@ function pintarPanelAdmin() {
         </div>
       </div>
     `;
+  } else if (panel.seccion === 'nube') {
+    const cfg = nube.cfg;
+    cuerpo = `
+      <div class="nube">
+        <p class="nube__estado" id="nube-estado"></p>
+
+        <div class="alert alert--pub">
+          <p><b>☁️ Nube en vivo (gratis)</b></p>
+          <p class="alert__pie">
+            Es lo que hace que las fotos y los precios cambien <b>en todos los celulares al mismo tiempo</b>.
+            Se configura una sola vez, en 5 minutos.
+          </p>
+          <ol class="nube__pasos">
+            <li>Entrá a <a href="https://supabase.com/dashboard" target="_blank" rel="noopener">supabase.com</a> y creá un proyecto (plan gratis).</li>
+            <li>Abrí <b>SQL Editor</b>, pegá el SQL de abajo y tocá <b>Run</b>.</li>
+            <li>Andá a <b>Storage</b> → <b>New bucket</b> → nombre <code>fotos</code> → <b>Public</b>.</li>
+            <li>En <b>Project Settings → API</b> copiá la <b>Project URL</b> y la <b>anon public key</b>, y pegalas acá.</li>
+          </ol>
+        </div>
+
+        <div class="field">
+          <label>PROJECT URL</label>
+          <input data-nube-url value="${esc(cfg.url || '')}" placeholder="https://tuproyecto.supabase.co" autocapitalize="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label>ANON PUBLIC KEY</label>
+          <input data-nube-clave type="password" value="${esc(cfg.clave || '')}" placeholder="eyJhbGciOi…" autocomplete="off" spellcheck="false">
+          <span class="field__hint">Queda guardada solo en este dispositivo. No se publica en GitHub.</span>
+        </div>
+        <div class="field">
+          <label>BUCKET DE FOTOS</label>
+          <input data-nube-bucket value="${esc(cfg.bucket || 'fotos')}" placeholder="fotos" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div class="dlg-actions">
+          <button class="btn btn--primary" type="button" data-nube-conectar>🔌 Conectar</button>
+          <button class="btn btn--ghost" type="button" data-nube-probar>🧪 Probar</button>
+          <button class="btn btn--ghost" type="button" data-nube-sync>☁️ Sincronizar ahora</button>
+        </div>
+        <p class="nube__resultado" data-nube-resultado></p>
+
+        <details class="nube__sql">
+          <summary>Ver el SQL para copiar</summary>
+          <pre>${esc(SQL_NUBE)}</pre>
+          <div class="dlg-actions">
+            <button class="btn btn--ghost btn--mini" type="button" data-copiar-sql>📋 Copiar SQL</button>
+          </div>
+        </details>
+
+        ${nube.activa()
+          ? `<button class="btn btn--ghost btn--block" type="button" data-nube-desconectar style="color:#ff9a9a">Desconectar la nube</button>`
+          : ''}
+
+        <p class="admin__peso">
+          <b>¿Y GitHub?</b> Sigue sirviendo para dejar la tienda publicada para siempre.
+          La nube es para los cambios del día a día: fotos, precios y stock.
+        </p>
+      </div>
+    `;
   } else {
     const pub = estado.tienda.publicacion || {};
     const hayToken = Boolean(leerToken());
@@ -2076,7 +2188,7 @@ function pintarPanelAdmin() {
            </div>
          </div>`
       : ''}
-    <div class="cats" role="tablist" aria-label="Secciones del panel">
+    <div class="cats cats--panel" role="tablist" aria-label="Secciones del panel">
       ${tabs.map(([id, nombre]) => `<button type="button" role="tab" data-panel-tab="${id}" aria-selected="${panel.seccion === id}">${nombre}</button>`).join('')}
     </div>
     ${cuerpo}
@@ -2085,12 +2197,16 @@ function pintarPanelAdmin() {
       <button class="btn btn--ghost" type="button" data-cerrar>Salir</button>
     </div>
   `;
+
+  if (panel.seccion === 'nube') pintarNube();
 }
 
 function guardarPanel() {
   guardarConfig();
   if (!estado.tienda.retiro?.includes(estado.retiro)) estado.retiro = estado.tienda.retiro?.[0] || '';
   pintarTodo();
+  // Si hay nube, subimos los cambios solos para que se vean en todos lados.
+  programarSync(700);
   toast('Cambios guardados ✅');
 }
 
@@ -2313,10 +2429,265 @@ async function publicarTienda() {
 }
 
 /* --------------------------------------------------------------------------
+   Nube en vivo
+   --------------------------------------------------------------------------
+   Con Supabase, lo que el dueño cambia en su celular aparece en el de todos
+   en pocos segundos. Si no está configurada, no pasa nada: la tienda sigue
+   funcionando con lo guardado en cada dispositivo.
+   -------------------------------------------------------------------------- */
+const SQL_NUBE = `-- MR. LOLO · pegar en Supabase → SQL Editor → New query → Run
+
+create table if not exists public.tienda (
+  id int primary key,
+  datos jsonb not null,
+  revision timestamptz not null default now()
+);
+
+alter table public.tienda enable row level security;
+
+drop policy if exists "mrlolo leer tienda" on public.tienda;
+drop policy if exists "mrlolo crear tienda" on public.tienda;
+drop policy if exists "mrlolo actualizar tienda" on public.tienda;
+
+create policy "mrlolo leer tienda" on public.tienda
+  for select using (true);
+create policy "mrlolo crear tienda" on public.tienda
+  for insert with check (true);
+create policy "mrlolo actualizar tienda" on public.tienda
+  for update using (true) with check (true);
+
+create table if not exists public.puntajes (
+  id bigserial primary key,
+  juego text not null,
+  nombre text not null,
+  avatar text,
+  puntos int not null,
+  creado_en timestamptz not null default now()
+);
+
+alter table public.puntajes enable row level security;
+
+drop policy if exists "mrlolo leer puntajes" on public.puntajes;
+drop policy if exists "mrlolo crear puntaje" on public.puntajes;
+
+create policy "mrlolo leer puntajes" on public.puntajes
+  for select using (true);
+create policy "mrlolo crear puntaje" on public.puntajes
+  for insert with check (true);
+
+-- Fotos: después de crear el bucket "fotos" como público, correr esto:
+drop policy if exists "mrlolo subir fotos" on storage.objects;
+drop policy if exists "mrlolo leer fotos" on storage.objects;
+create policy "mrlolo subir fotos" on storage.objects
+  for insert to anon with check (bucket_id = 'fotos');
+create policy "mrlolo leer fotos" on storage.objects
+  for select to anon using (bucket_id = 'fotos');
+`;
+
+let temporizadorSync = null;
+let nubeIniciada = false;
+let ultimaAplicada = '';
+
+function programarSync(ms = 800) {
+  if (!nube.activa()) return;
+  clearTimeout(temporizadorSync);
+  temporizadorSync = setTimeout(() => { sincronizarNube({ silencioso: true }); }, ms);
+}
+
+/* Sube las fotos que todavía viven como data URI y las cambia por su URL. */
+async function subirFotosPendientes() {
+  if (!nube.activa()) return 0;
+  let subidas = 0;
+  const tareas = [];
+
+  estado.productos.forEach((p) => {
+    if (!esFotoSubida(p.imagen)) return;
+    tareas.push((async () => {
+      try {
+        p.imagen = await nube.subirFoto(p.imagen, idProducto(p));
+        subidas += 1;
+      } catch { /* se reintenta en la próxima */ }
+    })());
+  });
+
+  if (esFotoSubida(estado.tienda.portada)) {
+    tareas.push((async () => {
+      try {
+        estado.tienda.portada = await nube.subirFoto(estado.tienda.portada, 'portada');
+        subidas += 1;
+      } catch { /* se reintenta en la próxima */ }
+    })());
+  }
+
+  await Promise.all(tareas);
+  if (subidas) { guardarConfig(); pintarTodo(); }
+  return subidas;
+}
+
+async function sincronizarNube({ silencioso = false } = {}) {
+  if (!nube.activa()) {
+    if (!silencioso) toast('Primero conectá la nube en Panel → Nube ☁️', 4500);
+    return false;
+  }
+  const boton = $('[data-nube-sync]');
+  if (boton) { boton.disabled = true; boton.textContent = '⏳ Subiendo…'; }
+  try {
+    const fotos = await subirFotosPendientes();
+    const datos = { tienda: estado.tienda, productos: estado.productos };
+    const r = await nube.guardar(datos);
+    if (r.ok) {
+      nube.avisarPestanas(datos, r.revision);
+      ultimaAplicada = r.revision;
+      if (!silencioso) toast(`Todo en vivo ✅${fotos ? ` · ${fotos} foto(s) subida(s)` : ''}`, 4200);
+      else if (fotos) toast(`📸 ${fotos} foto(s) publicada(s) al instante`, 3600);
+      pintarNube();
+      if (panel.seccion === 'nube' && panel.desbloqueado) pintarPanelAdmin();
+      return true;
+    }
+    if (!silencioso) toast(`No se pudo subir: ${r.motivo}`, 7000);
+    return false;
+  } finally {
+    if (boton?.isConnected) { boton.disabled = false; boton.textContent = '☁️ Sincronizar ahora'; }
+  }
+}
+
+/* Lo que llega de la nube reemplaza la vitrina de este dispositivo. */
+function aplicarRemoto(datos, revision = '') {
+  if (!datos || !Array.isArray(datos.productos) || !datos.productos.length) return;
+  if (revision && revision === ultimaAplicada) return;
+  ultimaAplicada = revision || ultimaAplicada;
+
+  const fotosAntes = new Map(estado.productos.map((p) => [p.id || p.nombre, p.imagen]));
+  estado.tienda = { ...estado.tienda, ...(datos.tienda || {}) };
+  estado.productos = datos.productos.map((p, i) => ({ ...p, id: p.id || idProducto(p, i) }));
+  if (!estado.tienda.retiro?.includes(estado.retiro)) estado.retiro = estado.tienda.retiro?.[0] || '';
+  estado.carrito = {};
+  guardarConfig();
+  pintarTodo();
+
+  const nuevas = estado.productos
+    .filter((p) => {
+      const previa = fotosAntes.get(p.id || p.nombre);
+      return previa && p.imagen && previa !== p.imagen;
+    })
+    .map((p) => p.nombre);
+
+  if (nuevas.length) {
+    nuevas.slice(0, 2).forEach((nombre) => toast(`📸 Foto nueva: ${nombre}`, 3200));
+    requestAnimationFrame(() => {
+      estado.productos.forEach((p, i) => {
+        if (nuevas.includes(p.nombre)) $(`.card[data-card="${i}"]`)?.classList.add('card--nueva');
+      });
+      setTimeout(() => $$('.card--nueva').forEach((c) => c.classList.remove('card--nueva')), 2800);
+    });
+  }
+
+  pintarNube();
+}
+
+function pintarNube() {
+  const chip = $('#chip-vivo');
+  if (!chip) return;
+  const activa = nube.activa();
+  chip.hidden = false;
+  chip.className = `vivo${activa ? (nube.estado === 'error' ? ' vivo--error' : ' vivo--on') : ' vivo--off'}`;
+  chip.innerHTML = `<i></i><b>${nube.etiqueta()}</b>${activa ? `<em>${nube.haceCuanto()}</em>` : ''}`;
+  chip.title = activa
+    ? `Sincronizado ${nube.haceCuanto()}. Toca para ver el estado.`
+    : 'Solo en este dispositivo. Conectá la nube para ver cambios en vivo.';
+
+  const estadoPanel = $('#nube-estado');
+  if (estadoPanel) {
+    estadoPanel.innerHTML = activa
+      ? `<b class="ok">● ${nube.etiqueta()}</b> · último dato ${nube.haceCuanto()}${nube.ultimoError ? ` · <em>${esc(nube.ultimoError)}</em>` : ''}`
+      : '<b>● MODO LOCAL</b> · los cambios se ven solo en este dispositivo';
+  }
+}
+
+function iniciarNube(forzar = false) {
+  if (!nubeIniciada) {
+    nubeIniciada = true;
+    nube.addEventListener('estado', pintarNube);
+    setInterval(pintarNube, 8000);
+  }
+  pintarNube();
+  if (!nube.activa()) return;
+  if (forzar || !nube.temporizador) {
+    nube.suscribir((datos, revision) => aplicarRemoto(datos, revision));
+    nube.reintentarPendiente().catch(() => { /* sin red */ });
+  }
+}
+
+/* --- Panel: nube -------------------------------------------------------- */
+function leerCfgNube() {
+  return {
+    url: $('[data-nube-url]')?.value?.trim() || '',
+    clave: $('[data-nube-clave]')?.value?.trim() || '',
+    bucket: $('[data-nube-bucket]')?.value?.trim() || 'fotos',
+  };
+}
+
+async function probarNube() {
+  const salida = $('[data-nube-resultado]');
+  const cfg = leerCfgNube();
+  if (!cfg.url || !cfg.clave) {
+    if (salida) salida.textContent = '❌ Falta la URL o la clave.';
+    return;
+  }
+  if (salida) salida.textContent = '⏳ Probando la conexión…';
+  const r = await nube.probar(cfg);
+  if (salida) {
+    salida.innerHTML = r.ok
+      ? `✅ Conecta bien. ${r.hayFila ? 'Ya hay una tienda guardada en la nube.' : 'La tabla está vacía: al conectar subimos todo.'}`
+      : `❌ ${esc(r.motivo)}`;
+  }
+}
+
+async function conectarNube() {
+  const salida = $('[data-nube-resultado]');
+  const cfg = leerCfgNube();
+  if (!cfg.url || !cfg.clave) {
+    if (salida) salida.textContent = '❌ Pegá la Project URL y la anon key.';
+    return;
+  }
+  if (salida) salida.textContent = '⏳ Conectando…';
+
+  const prueba = await nube.probar(cfg);
+  if (!prueba.ok) {
+    if (salida) salida.textContent = `❌ ${esc(prueba.motivo)}`;
+    return;
+  }
+
+  nube.configurar(cfg);
+
+  if (prueba.hayFila) {
+    // Ya hay una tienda en la nube: esa manda, para no pisar lo de otro celular.
+    try {
+      const leido = await nube.leer();
+      if (leido?.datos) aplicarRemoto(leido.datos, leido.revision);
+      toast('Conectado ✅ Ya había datos en la nube: los estamos usando.', 5000);
+    } catch {
+      toast('Conectado, pero no pudimos leer los datos. Probá "Sincronizar ahora".', 6000);
+    }
+  } else {
+    toast('Conectado ☁️ Subiendo la tienda…', 3000);
+    await sincronizarNube({ silencioso: false });
+  }
+
+  iniciarNube(true);
+  pintarPanelAdmin();
+  setTimeout(() => {
+    const el = $('[data-nube-resultado]');
+    if (el) el.innerHTML = '✅ Nube activa. Todo lo que cambies se ve en los demás celulares en segundos.';
+  }, 600);
+}
+
+
+/* --------------------------------------------------------------------------
    Interacción global (delegación de eventos)
    -------------------------------------------------------------------------- */
 document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-cat],[data-agregar],[data-mas],[data-menos],[data-retiro],[data-enviar],[data-cerrar],[data-cerrar-trivia],[data-repetir],[data-copiar-alias],[data-copiar-pedido],[data-alias],[data-respuesta],[data-trivia-otra],[data-trivia-siguiente],[data-trivia-progreso],[data-juego],[data-imprimir],[data-panel-tab],[data-desbloquear],[data-guardar-panel],[data-mover],[data-duplicar],[data-agotar],[data-borrar],[data-agregar-producto],[data-alternar],[data-exportar-data],[data-exportar-json],[data-importar],[data-restablecer],[data-foto],[data-quitar-foto],[data-avisar-stock],[data-publicar],[data-token],[data-usar-local],[data-descartar-local]');
+  const el = e.target.closest('[data-cat],[data-agregar],[data-mas],[data-menos],[data-retiro],[data-enviar],[data-cerrar],[data-cerrar-trivia],[data-repetir],[data-copiar-alias],[data-copiar-pedido],[data-alias],[data-respuesta],[data-trivia-otra],[data-trivia-siguiente],[data-trivia-progreso],[data-juego],[data-imprimir],[data-panel-tab],[data-desbloquear],[data-guardar-panel],[data-mover],[data-duplicar],[data-agotar],[data-borrar],[data-agregar-producto],[data-alternar],[data-exportar-data],[data-exportar-json],[data-importar],[data-restablecer],[data-foto],[data-quitar-foto],[data-avisar-stock],[data-publicar],[data-token],[data-usar-local],[data-descartar-local],[data-arcade],[data-foto-portada],[data-nube-conectar],[data-nube-probar],[data-nube-sync],[data-nube-desconectar],[data-copiar-sql]');
   if (!el) return;
 
   const d = el.dataset;
@@ -2346,6 +2717,7 @@ document.addEventListener('click', (e) => {
   if ('triviaOtra' in d) { terminarRonda(); cerrarDialogo('dlg-trivia'); setTimeout(iniciarTrivia, 200); return; }
 
   // --- Juegos ---
+  if ('arcade' in d) { abrirSala(); return; }
   if ('juego' in d) {
     cerrarDialogo('dlg-juegos');
     if (d.juego === 'tetris') setTimeout(abrirTetris, 160);
@@ -2431,6 +2803,20 @@ document.addEventListener('click', (e) => {
   }
   if ('avisarStock' in d) { avisarStockPorWhatsApp(); return; }
   if ('publicar' in d) { publicarTienda(); return; }
+
+  // --- Nube ---
+  if ('nubeConectar' in d) { conectarNube(); return; }
+  if ('nubeProbar' in d) { probarNube(); return; }
+  if ('nubeSync' in d) { sincronizarNube(); return; }
+  if ('nubeDesconectar' in d) {
+    nube.desconectar();
+    iniciarNube();
+    pintarPanelAdmin();
+    toast('Nube desconectada. La tienda sigue andando en modo local 💾', 5000);
+    return;
+  }
+  if ('copiarSql' in d) { copiar(SQL_NUBE, 'SQL copiado 📋'); return; }
+  if ('fotoPortada' in d) { $('[data-archivo-portada]')?.click(); return; }
   if ('usarLocal' in d) {
     if (!estado.configVieja) return;
     aplicarGuardado(estado.configVieja);
@@ -2547,7 +2933,7 @@ document.addEventListener('change', async (e) => {
     return;
   }
 
-  /* Foto de producto subida desde el panel */
+  /* Foto de producto subida desde el panel o desde el estudio */
   if ('archivoFoto' in input.dataset) {
     const i = Number(input.dataset.archivoFoto);
     const p = estado.productos[i];
@@ -2557,16 +2943,67 @@ document.addEventListener('change', async (e) => {
     const previa = p.imagen;
     try {
       p.imagen = await comprimirFoto(archivo);
-      if (guardarConfig()) {
-        pintarTodo();
-        pintarPanelAdmin();
-        toast('Foto actualizada ✅');
-      } else {
+      if (!guardarConfig()) {
         p.imagen = previa;
         guardarConfig();
-        toast('No hay espacio en este navegador para esa foto. Probá con una más chica o quitá otra.', 5000);
+        toast('No hay espacio en este navegador para esa foto. Probá con una más chica.', 5000);
+        input.value = '';
+        return;
+      }
+      pintarTodo();
+      pintarPanelAdmin();
+
+      if (nube.activa()) {
+        toast('Subiendo la foto a la nube…', 1800);
+        try {
+          p.imagen = await nube.subirFoto(p.imagen, idProducto(p));
+          guardarConfig();
+          pintarTodo();
+          pintarPanelAdmin();
+          toast('Foto publicada: ya la ven todos 📸', 3500);
+          programarSync(120);
+        } catch {
+          toast('Quedó guardada acá. Se sube sola cuando vuelva la conexión 📶', 5000);
+          programarSync(4000);
+        }
+      } else {
+        toast('Foto actualizada ✅ (solo en este dispositivo)', 3200);
       }
     } catch {
+      toast('No pudimos leer esa imagen');
+    }
+    input.value = '';
+    return;
+  }
+
+  /* Portada de la tienda */
+  if ('archivoPortada' in input.dataset) {
+    const archivo = input.files?.[0];
+    if (!archivo) return;
+    toast('Preparando la portada…', 1500);
+    const previa = estado.tienda.portada;
+    try {
+      estado.tienda.portada = await comprimirPortada(archivo);
+      guardarConfig();
+      pintarTextos();
+      pintarPanelAdmin();
+
+      if (nube.activa()) {
+        try {
+          estado.tienda.portada = await nube.subirFoto(estado.tienda.portada, 'portada');
+          guardarConfig();
+          pintarTextos();
+          programarSync(120);
+          toast('Portada publicada 📸', 3000);
+        } catch {
+          programarSync(4000);
+          toast('Portada guardada acá; se sube cuando vuelva la conexión', 4500);
+        }
+      } else {
+        toast('Portada actualizada ✅', 2600);
+      }
+    } catch {
+      estado.tienda.portada = previa;
       toast('No pudimos leer esa imagen');
     }
     input.value = '';
@@ -2688,6 +3125,7 @@ function pintarTodo() {
   pintarGrilla();
   pintarPanel();
   pintarTrivia();
+  pintarNube();
 }
 
 /* --------------------------------------------------------------------------
@@ -2708,6 +3146,23 @@ function iniciar() {
   $('#btn-sonido').setAttribute('aria-pressed', String(estado.sonido));
 
   pintarTodo();
+
+  // La sala arcade toma las riendas de los juegos.
+  configurarSala({
+    sonar,
+    vibrar,
+    toast,
+    almacen,
+    nube,
+    iniciarTetris: abrirTetris,
+    iniciarCaramelos: iniciarJuego,
+    productos: () => estado.productos,
+    premioActual: () => estado.tienda.premio,
+    nombreSugerido: estado.nombre || '',
+  });
+
+  // Sincronización en vivo (si hay nube configurada).
+  iniciarNube();
 
   // Service Worker: la tienda queda disponible sin conexión y se puede instalar.
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

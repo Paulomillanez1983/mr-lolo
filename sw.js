@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    MR. LOLO — Service Worker
    --------------------------------------------------------------------------
    Hace que la tienda abra al instante en la segunda visita y funcione sin
@@ -19,7 +19,7 @@
    que ya visitaron la tienda descarten la caché anterior.
    ========================================================================== */
 
-const VERSION = 'mrlolo-v5';
+const VERSION = 'mrlolo-v6';
 const CACHE = `${VERSION}-estaticos`;
 
 const BASE = new URL('./', self.location);
@@ -31,10 +31,17 @@ const ESENCIALES = [
   url('index.html'),
   url('manifest.webmanifest'),
   url('assets/css/app.css'),
+  url('assets/css/premium.css'),
   url('assets/js/app.js'),
   url('assets/js/data.js'),
   url('assets/js/qr.js'),
   url('assets/js/tetris.js'),
+  url('assets/js/nube.js'),
+  url('assets/js/sala.js'),
+  url('assets/js/arkanoid.js'),
+  url('assets/js/snake.js'),
+  url('assets/js/memoria.js'),
+  url('assets/js/quiz.js'),
   url('assets/img/logo.svg'),
   url('assets/img/icono-192.png'),
   url('assets/img/alfajor-havanna.webp'),

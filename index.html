@@ -37,10 +37,13 @@
 <link rel="apple-touch-icon" href="assets/img/icono-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 
-<link rel="preload" href="assets/css/app.css" as="style">
-<link rel="stylesheet" href="assets/css/app.css">
-<link rel="modulepreload" href="assets/js/app.js">
-<link rel="modulepreload" href="assets/js/data.js">
+ <link rel="preload" href="assets/css/app.css" as="style">
+ <link rel="stylesheet" href="assets/css/app.css">
+ <link rel="stylesheet" href="assets/css/premium.css">
+ <link rel="modulepreload" href="assets/js/app.js">
+ <link rel="modulepreload" href="assets/js/data.js">
+ <link rel="modulepreload" href="assets/js/nube.js">
+ <link rel="modulepreload" href="assets/js/sala.js">
 <script type="module" src="assets/js/app.js"></script>
 
 <script type="application/ld+json">
@@ -138,8 +141,9 @@
         <small data-t="firma">GOLOSINAS DEL RECREO</small>
       </span>
     </a>
-    <div class="topbar__actions">
-      <span class="chip" id="puntos" hidden>⭐ <b>0</b></span>
+     <div class="topbar__actions">
+       <span class="vivo" id="chip-vivo" hidden><i></i><b>LOCAL</b></span>
+       <span class="chip" id="puntos" hidden>⭐ <b>0</b></span>
       <span class="status" id="estado"><i></i><span>ABIERTO</span></span>
       <button class="iconbtn" id="btn-sonido" type="button" aria-pressed="true" aria-label="Activar o silenciar los sonidos">🔊</button>
     </div>
@@ -227,9 +231,32 @@
     </aside>
   </div>
 
+  <section class="arcade" id="arcade" aria-labelledby="titulo-arcade">
+    <div class="arcade__marquesina">
+      <span class="arcade__luces" aria-hidden="true"></span>
+      <div class="arcade__txt">
+        <span class="pill">ZONA GAMER</span>
+        <h2 id="titulo-arcade">SALA ARCADE</h2>
+        <p>Seis juegos, ranking entre todos y premios del recreo. Sin instalar nada.</p>
+        <div class="arcade__acciones">
+          <button class="btn btn--primary" type="button" data-arcade>▶ ENTRAR A LA SALA</button>
+          <span class="arcade__nota">🎬 Quiz Show · 🧱 Arkanoid · 🐍 Serpiente · 🧠 Memoria · 🧊 Tetris · 🍬 Lluvia</span>
+        </div>
+      </div>
+      <div class="arcade__cabinas" aria-hidden="true">
+        <span style="--c:#FF9500">🎬</span>
+        <span style="--c:#00B1EA">🧱</span>
+        <span style="--c:#00FF88">🐍</span>
+        <span style="--c:#C24BFF">🧠</span>
+        <span style="--c:#FF5C7A">🧊</span>
+        <span style="--c:#FFE600">🍬</span>
+      </div>
+    </div>
+  </section>
+
   <footer class="foot">
     <p class="foot__trust" data-t="pie">🏫 RETIRO EN EL COLE • 💳 PAGO POR MERCADO PAGO • 💬 PEDIDO POR WHATSAPP</p>
-    <p class="foot__ver">VERSIÓN <span data-t="version">3.1</span></p>
+    <p class="foot__ver">VERSIÓN <span data-t="version">4.0</span></p>
     <div class="foot__links">
       <a class="btn btn--ghost" id="btn-wa" href="#" target="_blank" rel="noopener">💬 Escribir a Lorenzo</a>
       <button class="btn btn--ghost" id="btn-juegos" type="button">🎮 Juegos</button>

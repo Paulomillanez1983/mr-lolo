@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    MR. LOLO — Datos de la tienda
    --------------------------------------------------------------------------
    Este es el ÚNICO archivo que hace falta tocar para cambiar la tienda.
@@ -10,10 +10,10 @@ export const TIENDA = {
   nombre: 'Mr. LOLO',
   bajada: 'Golosinas del recreo, a un toque 🍬',
   firma: 'GOLOSINAS DEL RECREO',
-  version: '3.1',
+  version: '4.0',
   // Revisión interna: cambia cuando se publica desde el panel. Sirve para
   // detectar si en un celular quedaron cambios guardados de una versión vieja.
-  revision: 'r3.1',
+  revision: 'r4.0',
 
   /* --- Contacto y pago -------------------------------------------------- */
   // WhatsApp con código de país, solo números (Argentina: 549 + área + número).
@@ -62,6 +62,10 @@ export const TIENDA = {
     rama: 'main',
     url: 'https://paulomillanez1983.github.io/mr-lolo/',
   },
+
+  /* --- Portada ---------------------------------------------------------- */
+  // Foto grande de la tienda (la carga el panel, sección Fotos).
+  portada: '',
 
   /* --- Dominio final (se usa para el QR) -------------------------------- */
   // Dejalo vacío y el QR usa la dirección real desde donde se abrió la tienda.

@@ -48,6 +48,7 @@ export function iniciarTetris(opciones = {}) {
     sonar = () => {},
     vibrar = () => {},
     alSalir = () => {},
+    alTerminar = null,
     recordInicial = 0,
     alGuardarRecord = () => {},
     premio = {},
@@ -426,6 +427,12 @@ export function iniciarTetris(opciones = {}) {
     const meta = Number(premio?.caramelos) || 0;
     const gano = meta > 0 && puntos >= meta;
     const titulo = nuevoRecord ? '¡NUEVO RÉCORD! 🏆' : gano ? '¡GANASTE UN PREMIO! 🎁' : 'Se apilaron las golosinas 😅';
+
+    // Desde la sala, el resultado lo muestra la sala (con XP, fichas y ranking).
+    if (typeof alTerminar === 'function') {
+      alTerminar(puntos, { lineas, nivel, record, nuevoRecord });
+      return;
+    }
 
     capa.hidden = false;
     capa.innerHTML = `

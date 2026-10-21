@@ -1,5 +1,9 @@
 # MR. LOLO — Tu tienda
 
+> **Versión 4.0:** la tienda ahora se actualiza **en vivo** en todos los celulares y tiene
+> una **sala de juegos** con 6 juegos, ranking y logros.
+> La guía corta de lo nuevo está en **[GUIA-4.0.md](GUIA-4.0.md)**.
+
 ## ✅ Ya está publicada, y funciona
 
 **Link para compartir: https://paulomillanez1983.github.io/mr-lolo/**
