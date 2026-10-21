@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    MR. LOLO — "EL DESAFÍO" (Quiz v5)
    --------------------------------------------------------------------------
    Formato PlayQuiz: imagen grande, pregunta, 3 opciones, barra de tiempo,
@@ -9,15 +9,41 @@
    ========================================================================== */
 
 import { FX } from './fx.js';
-import { CATEGORIAS, PREGUNTAS } from './quiz-data.js';
+import { CATEGORIAS, PREGUNTAS, NIVELES } from './quiz-data.js';
 
 const LETRAS = ['A', 'B', 'C'];
 
-const MODOS = [
-  { id: 'rapida', nombre: 'RÁPIDA', tiempo: 15, mult: 1, vidas: 2, detalle: '5 preguntas · 15s · x1' },
-  { id: 'intensa', nombre: 'INTENSA', tiempo: 10, mult: 2, vidas: 2, detalle: '5 preguntas · 10s · x2' },
-  { id: 'letal', nombre: 'MUERTE SÚBITA', tiempo: 6, mult: 3, vidas: 1, detalle: '5 preguntas · 6s · x3' },
-];
+const CLAVE_PERFIL = 'mrlolo.quiz.perfil';
+
+/* La dificultad no se elige: sale del historial del jugador.
+   Nivel 1 = arranque · Nivel 4 = experto. */
+function modoParaNivel(n) {
+  const nivel = Math.max(1, Math.min(4, n));
+  return {
+    id: 'auto',
+    nombre: `NIVEL ${nivel}`,
+    nivel,
+    tiempo: 16 - nivel * 2,          // 14 · 12 · 10 · 8 segundos
+    mult: 1 + (nivel - 1) * 0.5,     // x1 · x1,5 · x2 · x2,5
+    vidas: nivel >= 4 ? 2 : 3,
+  };
+}
+
+function cargarPerfilJuego() {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(CLAVE_PERFIL) || '{}');
+    return {
+      skill: Number.isFinite(guardado.skill) ? guardado.skill : 50,
+      vistos: Array.isArray(guardado.vistos) ? guardado.vistos : [],
+    };
+  } catch {
+    return { skill: 50, vistos: [] };
+  }
+}
+
+function guardarPerfilJuego(perfil) {
+  try { localStorage.setItem(CLAVE_PERFIL, JSON.stringify(perfil)); } catch { /* sin storage */ }
+}
 
 const mezclar = (lista) => {
   const copia = [...lista];
@@ -136,7 +162,8 @@ export function iniciarQuiz(opciones = {}) {
   const elCorteTxt = buscar('corte-txt');
 
   let tema = null;
-  let modo = MODOS[0];
+  let nivelJugador = 2;
+  let modo = modoParaNivel(2);
   let cola = [];
   let indice = 0;
   let puntos = 0;
@@ -179,25 +206,25 @@ export function iniciarQuiz(opciones = {}) {
   }
 
   function mostrarModos() {
+    const perfil = cargarPerfilJuego();
+    nivelJugador = 1 + Math.min(3, Math.floor(perfil.skill / 25));
+    modo = modoParaNivel(nivelJugador);
+
     elRueda.hidden = true;
     elModos.hidden = false;
     elTemaNombre.textContent = tema.nombre;
     elTemaNombre.style.color = tema.color;
-    elTemaDesc.textContent = tema.desc;
-    elModosLista.innerHTML = MODOS
-      .map(
-        (m) => `
-        <button type="button" class="quiz__modo" data-modo="${m.id}" style="--c:${tema.color}">
-          <b>${m.nombre}</b>
-          <small>${m.detalle}</small>
-        </button>`
-      )
-      .join('');
+    elTemaDesc.textContent = `${tema.desc} · dificultad automática`;
+    elModosLista.innerHTML = `
+      <button type="button" class="quiz__modo" data-modo="auto" style="--c:${tema.color}">
+        <b>NIVEL ${modo.nivel}</b>
+        <small>${modo.tiempo}s por pregunta · ${modo.vidas} vidas · x${modo.mult}</small>
+      </button>`;
     FX.sfx('moneda');
   }
 
-  function elegirModo(id) {
-    modo = MODOS.find((m) => m.id === id) || MODOS[0];
+  function elegirModo() {
+    modo = modoParaNivel(nivelJugador);
     elModos.hidden = true;
     elCorte.hidden = false;
     elCorteTxt.textContent = `${tema.icono} ${tema.nombre}`;
@@ -212,20 +239,66 @@ export function iniciarQuiz(opciones = {}) {
   /* --- Contenido --------------------------------------------------------- */
   function construirPreguntas(temaId) {
     const categoria = CATEGORIAS.find((c) => c.id === temaId);
-    const banco = PREGUNTAS[temaId] || [];
-    return mezclar(banco)
-      .slice(0, 5)
-      .map((q) => {
-        const pares = mezclar(q.opciones.map((texto, i) => ({ texto, ok: i === q.correcta })));
-        return {
-          tema: categoria?.nombre || '',
-          pregunta: q.pregunta,
-          visual: { tipo: 'escena', img: q.img },
-          opciones: pares.map((p) => p.texto),
-          correctaIdx: pares.findIndex((p) => p.ok),
-          dato: q.dato,
-        };
-      });
+    const perfil = cargarPerfilJuego();
+    const recientes = new Set(perfil.vistos);
+
+    const banco = (PREGUNTAS[temaId] || []).map((q, i) => ({
+      ...q,
+      sujeto: q.img,
+      nivel: NIVELES[temaId]?.[i] || 2,
+      tiempo: modo.tiempo,
+    }));
+
+    // Nunca dos preguntas con la misma imagen en la misma partida.
+    let pool = banco.filter((q) => !recientes.has(q.sujeto));
+    if (pool.length < 5) pool = banco;
+
+    // Mezcla de niveles: dos del nivel actual, una de repaso y dos de desafío.
+    const objetivos = [
+      nivelJugador,
+      nivelJugador,
+      Math.min(4, nivelJugador + 1),
+      Math.max(1, nivelJugador - 1),
+      Math.min(4, nivelJugador + 1),
+    ];
+    const libres = [...pool];
+    const elegidas = [];
+    const usados = new Set();
+
+    objetivos.forEach((objetivo) => {
+      const candidatas = libres.filter((q) => !usados.has(q.sujeto));
+      if (!candidatas.length) return;
+      const delNivel = candidatas.filter((q) => q.nivel === objetivo);
+      const grupo = delNivel.length ? delNivel : candidatas;
+      const elegida = grupo[Math.floor(Math.random() * grupo.length)];
+      elegidas.push(elegida);
+      usados.add(elegida.sujeto);
+    });
+
+    // Si faltara alguna, completamos con sujetos distintos.
+    mezclar(libres).forEach((q) => {
+      if (elegidas.length >= 5 || usados.has(q.sujeto)) return;
+      elegidas.push(q);
+      usados.add(q.sujeto);
+    });
+
+    // La partida arranca fácil y sube: orden por dificultad.
+    elegidas.sort((a, b) => a.nivel - b.nivel);
+
+    return elegidas.slice(0, 5).map((q) => {
+      const pares = mezclar(q.opciones.map((texto, i) => ({ texto, ok: i === q.correcta })));
+      return {
+        tema: categoria?.nombre || '',
+        pregunta: q.pregunta,
+        visual: { tipo: 'escena', img: q.img },
+        opciones: pares.map((p) => p.texto),
+        correctaIdx: pares.findIndex((p) => p.ok),
+        dato: q.dato,
+        sujeto: q.sujeto,
+        nivel: q.nivel,
+        tiempo: q.tiempo,
+      };
+    });
   }
 
   function empezarJuego() {
@@ -243,7 +316,7 @@ export function iniciarQuiz(opciones = {}) {
     elVidas.hidden = false;
     elPuntos.textContent = '0';
     elRacha.hidden = true;
-    elRondaNombre.textContent = tema.nombre;
+    elRondaNombre.textContent = `${tema.nombre} · NV ${nivelJugador}`;
     elRondaMult.textContent = `x${modo.mult}`;
     actualizarVidas();
     actualizarComodin();
@@ -313,7 +386,7 @@ export function iniciarQuiz(opciones = {}) {
 
     elPips.innerHTML = cola.map((_, i) => `<i class="${i < indice ? 'hecha' : i === indice ? 'on' : ''}"></i>`).join('');
 
-    restante = modo.tiempo;
+    restante = q.tiempo || modo.tiempo;
     ultimoTick = 99;
     pintarReloj();
     actualizarComodin();
@@ -324,7 +397,8 @@ export function iniciarQuiz(opciones = {}) {
   }
 
   function pintarReloj() {
-    const proporcion = Math.max(0, Math.min(1, restante / modo.tiempo));
+    const total = cola[indice]?.tiempo || modo.tiempo;
+    const proporcion = Math.max(0, Math.min(1, restante / total));
     elBarra.style.transform = `scaleX(${proporcion})`;
     elBarra.classList.toggle('quiz__barra--baja', proporcion < 0.3);
     elReloj.textContent = `${Math.max(0, Math.ceil(restante))}s`;
@@ -388,11 +462,18 @@ export function iniciarQuiz(opciones = {}) {
 
     respondidas += 1;
 
+    // El motor aprende: aciertos y velocidad suben el nivel; errores lo bajan.
+    const perfil = cargarPerfilJuego();
+    const velocidad = Math.max(0, restante) / (q.tiempo || modo.tiempo);
+    perfil.skill = Math.max(0, Math.min(100, perfil.skill + (acierto ? (velocidad > 0.5 ? 8 : 6) : -6)));
+    perfil.vistos = [q.sujeto, ...perfil.vistos.filter((s) => s !== q.sujeto)].slice(0, 12);
+    guardarPerfilJuego(perfil);
+
     if (acierto) {
       aciertos += 1;
       racha += 1;
       mejorRacha = Math.max(mejorRacha, racha);
-      const bonusVel = Math.round((Math.max(0, restante) / modo.tiempo) * 60);
+      const bonusVel = Math.round((Math.max(0, restante) / (q.tiempo || modo.tiempo)) * 60);
       const combo = Math.min(5, 1 + Math.floor(racha / 2));
       ganados = Math.round((100 + bonusVel) * modo.mult * combo);
       puntos += ganados;

@@ -2479,3 +2479,74 @@ dialog#dlg-panel .sheet { overscroll-behavior: contain; }
   color: rgb(255 255 255 / .32);
   letter-spacing: .04em;
 }
+
+/* --------------------------------------------------------------------------
+   22. Responsive real (celular y PC) + encuadre de fotos
+   -------------------------------------------------------------------------- */
+.quiz {
+  height: 100dvh;
+  max-height: 100dvh;
+}
+.quiz__foto--escena {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  padding: 6px;
+}
+.quiz__escena::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 55% at 50% 38%, transparent 40%, rgb(5 7 15 / .35) 100%),
+    linear-gradient(0deg, rgb(5 7 15 / .55), transparent 35%);
+}
+
+/* Pantallas angostas: todo entra sin scroll */
+@media (max-width: 520px) {
+  .quiz { gap: .3rem; padding-left: .55rem; padding-right: .55rem; }
+  .quiz__top { gap: .3rem; }
+  .quiz__brand { font-size: .52rem; letter-spacing: .04em; }
+  .quiz__marcador { padding: .25rem .4rem; }
+  .quiz__marcador b { font-size: .9rem; }
+  .quiz__vidas { font-size: .8rem; }
+  .quiz__racha { font-size: .55rem; padding: .28rem .4rem; }
+  .quiz__x { width: 30px; height: 30px; }
+  .quiz__wheel-wrap { width: min(74vw, 270px, 36vh); }
+  .quiz__girar { padding: .6rem 1.2rem; font-size: .72rem; }
+  .quiz__juego { grid-template-rows: auto minmax(110px, 1fr) auto !important; gap: .3rem; }
+  .quiz__pregunta { font-size: .95rem; line-height: 1.15; }
+  .quiz__opcion { min-height: 46px; padding: .42rem .55rem; gap: .45rem; }
+  .quiz__letra { width: 28px; height: 28px; font-size: .74rem; }
+  .quiz__texto { font-size: .78rem; }
+  .quiz__timer { gap: .35rem; }
+  .quiz__reloj { font-size: .7rem; min-width: 28px; }
+  .quiz__feedback { min-height: 46px; padding: .35rem .55rem; }
+  .quiz__feedback small { display: none; }
+  .quiz__marca { font-size: .46rem; padding: .3rem .4rem; }
+  .quiz__barra-ronda { padding: .28rem .45rem; }
+}
+
+/* Pantallas bajas (celular apaisado o ventana chica) */
+@media (max-height: 620px) {
+  .quiz__wheel-wrap { width: min(38vh, 220px); }
+  .quiz__rueda h1 { font-size: 1.9rem; }
+  .quiz__intro-pasos { display: none; }
+  .quiz__imagen { max-height: 26vh; }
+}
+
+/* PC: contenido centrado y más aire */
+@media (min-width: 900px) {
+  .quiz { padding-left: max(1.5rem, calc((100vw - 1040px) / 2)); padding-right: max(1.5rem, calc((100vw - 1040px) / 2)); }
+  .quiz__juego { max-width: 1040px; width: 100%; margin: 0 auto; }
+  .quiz__rueda, .quiz__modos { max-width: 720px; margin: 0 auto; width: 100%; }
+  .quiz__imagen { max-height: 44vh; }
+  .quiz__pregunta { font-size: 1.45rem; }
+  .quiz__opcion { min-height: 62px; }
+  .quiz__texto { font-size: .95rem; }
+}

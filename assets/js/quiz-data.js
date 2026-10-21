@@ -109,6 +109,13 @@ export const PREGUNTAS = {
       correcta: 0,
       dato: '"Ser o no ser" es una de sus frases más famosas.',
     },
+    {
+      img: img('saint-exupery'),
+      pregunta: '¿Quién escribió "El Principito"?',
+      opciones: ['Antoine de Saint-Exupéry', 'Julio Verne', 'J. K. Rowling'],
+      correcta: 0,
+      dato: 'Lo publicó en 1943 y él mismo hizo las acuarelas.',
+    },
   ],
 
   mundo: [
@@ -199,6 +206,13 @@ export const PREGUNTAS = {
       correcta: 0,
       dato: 'Lo ganó en 1921 por el efecto fotoeléctrico.',
     },
+    {
+      img: img('marie-curie'),
+      pregunta: '¿En qué dos áreas ganó el Nobel Marie Curie?',
+      opciones: ['Física y Química', 'Medicina y Paz', 'Literatura y Física'],
+      correcta: 0,
+      dato: 'Fue la primera persona en ganar dos Nobel en ciencias.',
+    },
   ],
 
   arte: [
@@ -243,6 +257,20 @@ export const PREGUNTAS = {
       opciones: ['Austria', 'Alemania', 'Italia'],
       correcta: 0,
       dato: 'Nació en Salzburgo, en 1756.',
+    },
+    {
+      img: img('picasso'),
+      pregunta: '¿Quién pintó el "Guernica"?',
+      opciones: ['Pablo Picasso', 'Salvador Dalí', 'Joan Miró'],
+      correcta: 0,
+      dato: 'Lo pintó en 1937, inspirado en el bombardeo de esa ciudad.',
+    },
+    {
+      img: img('miguel-angel'),
+      pregunta: '¿Quién pintó el techo de la Capilla Sixtina?',
+      opciones: ['Miguel Ángel', 'Leonardo da Vinci', 'Rafael'],
+      correcta: 0,
+      dato: 'Tardó cuatro años, entre 1508 y 1512.',
     },
   ],
 
@@ -289,5 +317,23 @@ export const PREGUNTAS = {
       correcta: 0,
       dato: 'Se hundió a unos 600 km de la costa de Terranova.',
     },
+    {
+      img: img('washington'),
+      pregunta: '¿Quién fue el primer presidente de Estados Unidos?',
+      opciones: ['George Washington', 'Abraham Lincoln', 'Thomas Jefferson'],
+      correcta: 0,
+      dato: 'Asumió en 1789, después de la independencia.',
+    },
   ],
+};
+
+/* Dificultad de cada pregunta, en el mismo orden que arriba.
+   1 = fácil · 2 = normal · 3 = difícil · 4 = experto */
+export const NIVELES = {
+  futbol: [2, 1, 2, 1, 1, 1],
+  literatura: [1, 2, 1, 2, 2, 2, 3],
+  mundo: [1, 1, 2, 1, 1, 1],
+  ciencia: [2, 1, 1, 1, 2, 3, 3],
+  arte: [1, 2, 1, 3, 2, 2, 3, 3],
+  historia: [1, 1, 2, 2, 1, 2, 2],
 };
