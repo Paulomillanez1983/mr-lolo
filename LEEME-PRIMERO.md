@@ -6,7 +6,7 @@
 
 ## ✅ Ya está publicada, y funciona
 
-**Link para compartir: https://paulomillanez1983.github.io/mr-lolo/**
+**Link para compartir: https://mr-lolo.vercel.app/**
 
 Con HTTPS gratis incluido. Ese es el link que Lorenzo manda a los grupos, a la familia
 y a los amigos. Está online en GitHub Pages, dentro de tu propia cuenta de GitHub
@@ -92,7 +92,7 @@ Funciona igual porque todas las rutas del sitio son relativas.
 
 ## 2. El link ya está configurado para verse lindo (hecho)
 
-Cuando mandes `https://paulomillanez1983.github.io/mr-lolo/` por WhatsApp, va a aparecer
+Cuando mandes `https://mr-lolo.vercel.app/` por WhatsApp, va a aparecer
 una tarjeta con el logo, el nombre y los precios — no un link pelado. Eso ya quedó
 configurado en `index.html` (canonical, og:url, og:image, twitter:image y los datos para
 Google) y la imagen que se usa es `assets/img/portada.jpg`.
@@ -365,8 +365,8 @@ Google quién visita la tienda de tu hijo) y funciona aunque el colegio tenga in
 
 ## 6. Cosas a tener en cuenta (te las digo derecho)
 
-- **Ya está publicada**: quedó online en `https://paulomillanez1983.github.io/mr-lolo/`,
-  dentro de tu cuenta de GitHub (`Paulomillanez1983/mr-lolo`), con HTTPS forzado y gratis.
+- **Ya está publicada**: quedó online en `https://mr-lolo.vercel.app/` (Vercel, plan Hobby,
+  HTTPS y gratis), y el código vive en GitHub (`Paulomillanez1983/mr-lolo`).
 - **El repositorio es público**: GitHub Pages con HTTPS gratis solo funciona así en cuentas
   gratuitas. Como la tienda es para compartir igual, no hay problema. Si algún día querés
   que no se vea el código, hay que pasar a un plan pago de GitHub o mover el sitio a otro

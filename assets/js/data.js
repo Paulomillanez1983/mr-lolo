@@ -60,7 +60,7 @@ export const TIENDA = {
     usuario: 'Paulomillanez1983',
     repo: 'mr-lolo',
     rama: 'main',
-    url: 'https://paulomillanez1983.github.io/mr-lolo/',
+    url: 'https://mr-lolo.vercel.app/',
   },
 
   /* --- Portada ---------------------------------------------------------- */
