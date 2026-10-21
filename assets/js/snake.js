@@ -47,7 +47,7 @@ export function iniciarSnake(opciones = {}) {
     </div>
     <div class="snk__stage" data-snk="stage">
       <canvas data-snk="lienzo"></canvas>
-      <span class="snk__hint" data-snk="hint">Apoyá el pulgar y arrastrá</span>
+      <span class="snk__hint" data-snk="hint">Apoyá el pulgar y arrastrá para empezar</span>
       <div class="snk__capa" data-snk="capa"></div>
     </div>
   `;
@@ -74,7 +74,7 @@ export function iniciarSnake(opciones = {}) {
   let comida = { x: 5, y: 5, tipo: 0 };
   let puntos = 0;
   let mejor = Number(record) || 0;
-  let estado = 'jugando';     // jugando | pausa | fin
+  let estado = 'listo';       // listo | jugando | pausa | fin
   let acumulado = 0;
   let ultimo = 0;
   let raf = 0;
@@ -117,7 +117,7 @@ export function iniciarSnake(opciones = {}) {
     puntos = 0;
     acumulado = 0;
     chispas = [];
-    estado = 'jugando';
+    estado = 'listo';
     aviso = '';
     sembrarComida();
     actualizarHud();
@@ -148,6 +148,12 @@ export function iniciarSnake(opciones = {}) {
   }
 
   function girar(x, y) {
+    // La serpiente no arranca sola: espera el primer gesto del jugador.
+    if (estado === 'listo') {
+      estado = 'jugando';
+      ultimo = performance.now();
+      pista?.classList.add('snk__hint--off');
+    }
     if (estado !== 'jugando') return;
     if (direccion.x === -x && direccion.y === -y) return;
     if (direccion.x === 0 && x === 0 && direccion.y === 0) return;
